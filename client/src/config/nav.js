@@ -98,10 +98,10 @@ export const APP_NAVIGATION = {
     },
     {
       id: 'fundraisers',
-      title: 'Fundraisers',
-      description: 'Campaigns, target progress, and task assignments',
+      title: 'Volunteer Tasks',
+      description: 'Assign students as volunteers, allocate tasks, and track activity',
       path: '/admin/fundraisers',
-      icon: TrendingUp,
+      icon: CheckSquare,
     },
     {
       id: 'expenses',
@@ -157,10 +157,10 @@ export const APP_NAVIGATION = {
     },
     {
       id: 'fundraisers',
-      title: 'Fundraisers',
-      description: 'Campaigns, target progress, and task assignments',
+      title: 'Volunteer Tasks',
+      description: 'Assign students as volunteers, allocate tasks, and track activity',
       path: '/organizer/fundraisers',
-      icon: TrendingUp,
+      icon: CheckSquare,
     },
     {
       id: 'expenses',

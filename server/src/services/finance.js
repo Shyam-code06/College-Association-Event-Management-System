@@ -78,10 +78,24 @@ const financeService = {
    * Computes financial summary (total income, total expenses, balance, category breakdown).
    */
   getFinanceSummary: async (collegeId, queryParams = {}) => {
-    return financeModel.getFinanceSummary(collegeId, {
+    const summary = await financeModel.getFinanceSummary(collegeId, {
       startDate: queryParams.startDate,
       endDate: queryParams.endDate
     });
+
+    // Provide by_category for FinanceLedger chart
+    const by_category = (summary.categoryBreakdown || []).map((item) => ({
+      category: item.categoryName,
+      amount: item.totalAmount,
+      type: item.type
+    }));
+
+    return {
+      ...summary,
+      total_income: summary.totalIncome,
+      total_expense: summary.totalExpenses,
+      by_category
+    };
   }
 };
 

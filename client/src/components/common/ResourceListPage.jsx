@@ -2,8 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable } from '@/components/ui/DataTable';
 import { SearchInput } from '@/components/ui/SearchInput';
-import { usePagination } from '@/hooks/usePagination';
-import { useDebounce } from '@/hooks/useDebounce';
 
 const EMPTY_PARAMS = {};
 
@@ -25,15 +23,26 @@ export const ResourceListPage = ({
   headerChildren,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const debouncedSearch = useDebounce(searchTerm, 350);
 
   const [data, setData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sortField, setSortField] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc');
 
-  const { page, limit, total, totalPages, setPage, setPaginationData, resetPage } =
-    usePagination(1, 10);
+  // Direct Pagination States
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const setPaginationData = useCallback((meta = {}) => {
+    if (meta.page !== undefined) setPage(meta.page);
+    if (meta.limit !== undefined) setLimit(meta.limit);
+    if (meta.total !== undefined) setTotal(meta.total);
+    if (meta.totalPages !== undefined) setTotalPages(meta.totalPages);
+  }, []);
+
+  const resetPage = useCallback(() => setPage(1), []);
 
   const apiRef = useRef(api);
   apiRef.current = api;
@@ -47,7 +56,7 @@ export const ResourceListPage = ({
       const params = {
         page,
         limit,
-        search: debouncedSearch || undefined,
+        search: searchTerm || undefined,
         sort: sortField || undefined,
         order: sortField ? sortOrder : undefined,
         ...defaultParamsRef.current,
@@ -71,7 +80,7 @@ export const ResourceListPage = ({
     } finally {
       setIsLoading(false);
     }
-  }, [page, limit, debouncedSearch, sortField, sortOrder, title, setPaginationData]);
+  }, [page, limit, searchTerm, sortField, sortOrder, title, setPaginationData]);
 
   useEffect(() => {
     fetchData();

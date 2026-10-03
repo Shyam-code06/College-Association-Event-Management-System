@@ -45,7 +45,13 @@ const reportsService = {
         memberAttendees: stats.memberAttendees,
         nonMemberAttendees: stats.nonMemberAttendees,
         ticketRevenue: stats.ticketRevenue
-      }
+      },
+      // Flat properties expected by EventReport frontend charts & stats
+      capacity: event.capacity,
+      total_registered: stats.totalRegistrations,
+      checked_in: stats.attendees,
+      total_revenue: stats.ticketRevenue,
+      member_registrations: stats.memberAttendees
     };
   },
 
@@ -57,6 +63,24 @@ const reportsService = {
     const activeMembers = await membershipModel.countMembers(collegeId, { status: 'active' });
     const totalEvents = await eventModel.count(collegeId, {});
     const financeSummary = await financeModel.getFinanceSummary(collegeId, {});
+
+    // Metrics for graphs and overview dashboard cards
+    const orderModel = require('../models/order');
+    const expenseModel = require('../models/expense');
+    const fundraiserModel = require('../models/fundraiser');
+    const userModel = require('../models/user');
+    const db = require('../config/database');
+
+    const regCountRes = await db('registrations')
+      .where('college_id', collegeId)
+      .count('id as count')
+      .first();
+    const totalRegistrations = parseInt(regCountRes?.count || 0, 10);
+
+    const totalOrders = await orderModel.countOrders(collegeId, {});
+    const pendingExpenses = await expenseModel.count(collegeId, { status: 'pending' });
+    const activeOrganizers = await userModel.countCollegeUsers(collegeId, { role: ROLES.ORGANIZER });
+    const activeFundraisers = await fundraiserModel.countFundraisers(collegeId, { status: 'active' });
 
     return {
       membership: {
@@ -70,7 +94,16 @@ const reportsService = {
         totalIncome: financeSummary.totalIncome,
         totalExpenses: financeSummary.totalExpenses,
         balance: financeSummary.balance
-      }
+      },
+      // Flat properties expected by Frontend Dashboard Cards & Recharts
+      total_members: activeMembers || totalMembers,
+      total_events: totalEvents,
+      total_registrations: totalRegistrations,
+      total_revenue: financeSummary.totalIncome,
+      total_orders: totalOrders,
+      pending_expenses: pendingExpenses,
+      active_organizers: activeOrganizers,
+      active_fundraisers: activeFundraisers
     };
   }
 };
