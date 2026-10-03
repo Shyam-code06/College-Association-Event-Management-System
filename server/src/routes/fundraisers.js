@@ -25,10 +25,10 @@ router.get(
   asyncHandler(fundraisersController.getStudentTasks)
 );
 
-// Student or Admin: update task status
+// Student, Organizer or Admin: update task status
 router.patch(
   '/tasks/:taskId/status',
-  authorize(ROLES.STUDENT, ROLES.COLLEGE_ADMIN),
+  authorize(ROLES.STUDENT, ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
   validate(updateTaskStatusSchema),
   asyncHandler(fundraisersController.updateTaskStatus)
 );
@@ -45,30 +45,30 @@ router.get(
   asyncHandler(fundraisersController.getFundraiserById)
 );
 
-// College Admin: create, update, and assign tasks
+// College Admin & Organizer: create, update, and assign tasks
 router.post(
   '/',
-  authorize(ROLES.COLLEGE_ADMIN),
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
   validate(createFundraiserSchema),
   asyncHandler(fundraisersController.createFundraiser)
 );
 
 router.patch(
   '/:id',
-  authorize(ROLES.COLLEGE_ADMIN),
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
   validate(updateFundraiserSchema),
   asyncHandler(fundraisersController.updateFundraiser)
 );
 router.put(
   '/:id',
-  authorize(ROLES.COLLEGE_ADMIN),
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
   validate(updateFundraiserSchema),
   asyncHandler(fundraisersController.updateFundraiser)
 );
 
 router.post(
   '/:id/tasks',
-  authorize(ROLES.COLLEGE_ADMIN),
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
   validate(createTaskSchema),
   asyncHandler(fundraisersController.createTask)
 );

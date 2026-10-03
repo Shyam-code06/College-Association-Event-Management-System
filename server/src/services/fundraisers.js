@@ -114,7 +114,7 @@ const fundraisersService = {
 
   /**
    * Updates task status.
-   * Students can only update tasks assigned to them; College Admin can update any.
+   * Students can only update tasks assigned to them; College Admin and Organizer can update any.
    */
   updateTaskStatus: async (taskId, collegeId, user, status) => {
     const task = await fundraiserModel.findTaskById(taskId, collegeId);
