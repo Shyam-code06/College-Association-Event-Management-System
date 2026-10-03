@@ -1,0 +1,13 @@
+const Joi = require('joi');
+const { ALL_ROLES } = require('../constants/roles');
+
+const listCollegeUsersSchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(10),
+  role: Joi.string().valid(...ALL_ROLES),
+  search: Joi.string().trim().allow('')
+});
+
+module.exports = {
+  listCollegeUsersSchema
+};

@@ -1,0 +1,195 @@
+const db = require('../config/database');
+const { applyTenantScope } = require('../utils/tenantScope');
+const { MEMBERSHIP_STATUS, DUES_STATUS } = require('../constants/statuses');
+
+const membershipModel = {
+  // --- Membership Plans ---
+  findPlanById: async (id, collegeId, trx = db) => {
+    let query = trx('membership_plans').where('id', id);
+    query = applyTenantScope(query, collegeId);
+    return query.first();
+  },
+
+  findAllPlans: async (collegeId, trx = db) => {
+    let query = trx('membership_plans').where('is_active', true);
+    query = applyTenantScope(query, collegeId);
+    return query.orderBy('fee', 'asc');
+  },
+
+  createPlan: async (collegeId, planData, trx = db) => {
+    const [id] = await trx('membership_plans').insert({
+      college_id: collegeId,
+      ...planData
+    });
+    return trx('membership_plans').where({ id, college_id: collegeId }).first();
+  },
+
+  updatePlan: async (id, collegeId, updateData, trx = db) => {
+    let query = trx('membership_plans').where('id', id);
+    query = applyTenantScope(query, collegeId);
+    await query.update(updateData);
+    return trx('membership_plans').where({ id, college_id: collegeId }).first();
+  },
+
+  // --- User Memberships ---
+  createMembership: async (collegeId, data, trx = db) => {
+    const [id] = await trx('memberships').insert({
+      college_id: collegeId,
+      ...data
+    });
+    return trx('memberships').where({ id, college_id: collegeId }).first();
+  },
+
+  findById: async (id, collegeId, trx = db) => {
+    let query = trx('memberships')
+      .select('memberships.*', 'membership_plans.name as plan_name', 'membership_plans.fee as plan_fee')
+      .leftJoin('membership_plans', 'memberships.plan_id', 'membership_plans.id')
+      .where('memberships.id', id);
+
+    query = applyTenantScope(query, collegeId, 'memberships');
+    return query.first();
+  },
+
+  findByUserId: async (userId, collegeId, trx = db) => {
+    let query = trx('memberships')
+      .select(
+        'memberships.*',
+        'membership_plans.name as plan_name',
+        'membership_plans.fee as plan_fee',
+        'membership_plans.merch_discount_percent',
+        'membership_plans.ticket_discount_note'
+      )
+      .leftJoin('membership_plans', 'memberships.plan_id', 'membership_plans.id')
+      .where('memberships.user_id', userId);
+
+    query = applyTenantScope(query, collegeId, 'memberships');
+    return query.orderBy('memberships.created_at', 'desc').first();
+  },
+
+  getActiveMembership: async (userId, collegeId, trx = db) => {
+    const today = new Date().toISOString().split('T')[0];
+    let query = trx('memberships')
+      .select(
+        'memberships.*',
+        'membership_plans.name as plan_name',
+        'membership_plans.merch_discount_percent',
+        'membership_plans.ticket_discount_note'
+      )
+      .leftJoin('membership_plans', 'memberships.plan_id', 'membership_plans.id')
+      .where('memberships.user_id', userId)
+      .where('memberships.status', MEMBERSHIP_STATUS.ACTIVE)
+      .where('memberships.dues_status', DUES_STATUS.PAID)
+      .where('memberships.expiry_date', '>=', today);
+
+    query = applyTenantScope(query, collegeId, 'memberships');
+    return query.first();
+  },
+
+  findAllMembers: async (collegeId, { status, search, offset = 0, limit = 10 }, trx = db) => {
+    let query = trx('memberships')
+      .select(
+        'memberships.id',
+        'memberships.college_id',
+        'memberships.user_id',
+        'memberships.status',
+        'memberships.dues_status',
+        'memberships.start_date',
+        'memberships.expiry_date',
+        'memberships.created_at',
+        'users.name as user_name',
+        'users.email as user_email',
+        'membership_plans.name as plan_name'
+      )
+      .join('users', 'memberships.user_id', 'users.id')
+      .join('membership_plans', 'memberships.plan_id', 'membership_plans.id');
+
+    query = applyTenantScope(query, collegeId, 'memberships');
+
+    if (status) {
+      query = query.where('memberships.status', status);
+    }
+
+    if (search) {
+      query = query.where((q) => {
+        q.where('users.name', 'like', `%${search}%`).orWhere('users.email', 'like', `%${search}%`);
+      });
+    }
+
+    return query.orderBy('memberships.created_at', 'desc').offset(offset).limit(limit);
+  },
+
+  countMembers: async (collegeId, { status, search }, trx = db) => {
+    let query = trx('memberships')
+      .join('users', 'memberships.user_id', 'users.id');
+
+    query = applyTenantScope(query, collegeId, 'memberships');
+
+    if (status) {
+      query = query.where('memberships.status', status);
+    }
+
+    if (search) {
+      query = query.where((q) => {
+        q.where('users.name', 'like', `%${search}%`).orWhere('users.email', 'like', `%${search}%`);
+      });
+    }
+
+    const result = await query.count('memberships.id as count').first();
+    return parseInt(result.count, 10);
+  },
+
+  verifyMemberStatus: async (collegeId, queryValue, trx = db) => {
+    let query = trx('memberships')
+      .select(
+        'memberships.id',
+        'memberships.college_id',
+        'memberships.status',
+        'memberships.dues_status',
+        'memberships.start_date',
+        'memberships.expiry_date',
+        'users.id as user_id',
+        'users.name as user_name',
+        'users.email as user_email',
+        'membership_plans.name as plan_name'
+      )
+      .join('users', 'memberships.user_id', 'users.id')
+      .join('membership_plans', 'memberships.plan_id', 'membership_plans.id');
+
+    query = applyTenantScope(query, collegeId, 'memberships');
+
+    if (!isNaN(queryValue)) {
+      query = query.where((q) => {
+        q.where('users.id', queryValue).orWhere('users.email', queryValue);
+      });
+    } else {
+      query = query.where('users.email', queryValue);
+    }
+
+    return query.orderBy('memberships.created_at', 'desc').first();
+  },
+
+  updateMembership: async (id, collegeId, data, trx = db) => {
+    let query = trx('memberships').where('id', id);
+    query = applyTenantScope(query, collegeId);
+    await query.update(data);
+    return trx('memberships').where({ id, college_id: collegeId }).first();
+  },
+
+  findExpiringMemberships: async (daysThreshold = 7, trx = db) => {
+    // Find active memberships expiring in target days where reminder was not sent
+    return trx('memberships')
+      .select('memberships.*', 'users.email', 'users.name')
+      .join('users', 'memberships.user_id', 'users.id')
+      .where('memberships.status', MEMBERSHIP_STATUS.ACTIVE)
+      .whereNull('memberships.reminder_sent_at')
+      .whereRaw('DATEDIFF(memberships.expiry_date, CURDATE()) <= ? AND DATEDIFF(memberships.expiry_date, CURDATE()) >= 0', [daysThreshold]);
+  },
+
+  findExpiredActiveMemberships: async (trx = db) => {
+    return trx('memberships')
+      .where('status', MEMBERSHIP_STATUS.ACTIVE)
+      .whereRaw('expiry_date < CURDATE()');
+  }
+};
+
+module.exports = membershipModel;
