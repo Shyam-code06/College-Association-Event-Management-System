@@ -13,7 +13,13 @@ const eventModel = {
 
   findById: async (id, collegeId, trx = db) => {
     let query = trx('events')
-      .select('events.*', 'users.name as creator_name')
+      .select(
+        'events.*',
+        'events.name as title',
+        'events.location as venue',
+        'events.non_member_price as price',
+        'users.name as creator_name'
+      )
       .leftJoin('users', 'events.created_by', 'users.id')
       .where('events.id', id);
 
@@ -44,6 +50,9 @@ const eventModel = {
     let query = trx('events')
       .select(
         'events.*',
+        'events.name as title',
+        'events.location as venue',
+        'events.non_member_price as price',
         'users.name as creator_name',
         trx.raw(`
           (events.capacity - (

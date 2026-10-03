@@ -23,6 +23,7 @@ router.use('/auth', authRoutes);
 router.use('/colleges', collegesRoutes);
 router.use('/super-admin/college-admins', collegeAdminsRoutes);
 router.use('/organizers', organizersRoutes);
+router.use('/college-admin/organizers', organizersRoutes);
 router.use('/users', usersRoutes);
 router.use('/memberships', membershipsRoutes);
 router.use('/events', eventsRoutes);

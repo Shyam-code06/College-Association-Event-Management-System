@@ -20,10 +20,8 @@ const reportsService = {
       throw new AppError('Event not found', 404);
     }
 
-    // Organizers can only view reports for events they created
-    if (user.role === ROLES.ORGANIZER && event.created_by !== user.id) {
-      throw new AppError('Organizers can only view reports for events they created', 403);
-    }
+    // Organizers and College Admins can view reports for events in their college
+    // (collegeId tenancy is verified by eventModel.findById)
 
     const stats = await registrationModel.getEventReportStats(eventId, collegeId);
 

@@ -21,17 +21,23 @@ router.use(auth, tenant);
 // Public within college (Student, Organizer, College Admin)
 router.get('/plans', asyncHandler(membershipsController.listPlans));
 
-// College Admin: manage plans
+// College Admin & Organizer: manage plans
 router.post(
   '/plans',
-  authorize(ROLES.COLLEGE_ADMIN),
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
   validate(createPlanSchema),
   asyncHandler(membershipsController.createPlan)
 );
 
 router.patch(
   '/plans/:id',
-  authorize(ROLES.COLLEGE_ADMIN),
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
+  validate(updatePlanSchema),
+  asyncHandler(membershipsController.updatePlan)
+);
+router.put(
+  '/plans/:id',
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
   validate(updatePlanSchema),
   asyncHandler(membershipsController.updatePlan)
 );

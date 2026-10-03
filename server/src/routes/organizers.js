@@ -40,6 +40,11 @@ router.patch(
   validate(updateOrganizerSchema),
   asyncHandler(organizersController.update)
 );
+router.put(
+  '/:id',
+  validate(updateOrganizerSchema),
+  asyncHandler(organizersController.update)
+);
 
 router.patch(
   '/:id/access',

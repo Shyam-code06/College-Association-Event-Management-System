@@ -36,8 +36,14 @@ router.post(
   asyncHandler(eventsController.create)
 );
 
-// College Admin & Organizer can update events
+// College Admin & Organizer can update events (accepts both PATCH and PUT)
 router.patch(
+  '/:id',
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
+  validate(updateEventSchema),
+  asyncHandler(eventsController.update)
+);
+router.put(
   '/:id',
   authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
   validate(updateEventSchema),
@@ -46,6 +52,11 @@ router.patch(
 
 // College Admin & Organizer can cancel events
 router.post(
+  '/:id/cancel',
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
+  asyncHandler(eventsController.cancel)
+);
+router.patch(
   '/:id/cancel',
   authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
   asyncHandler(eventsController.cancel)

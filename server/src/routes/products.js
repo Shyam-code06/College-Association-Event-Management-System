@@ -51,6 +51,12 @@ router.patch(
   validate(updateProductSchema),
   asyncHandler(productsController.update)
 );
+router.put(
+  '/:id',
+  authorize(ROLES.COLLEGE_ADMIN),
+  validate(updateProductSchema),
+  asyncHandler(productsController.update)
+);
 
 router.post(
   '/:id/variants',

@@ -59,6 +59,12 @@ router.patch(
   validate(updateFundraiserSchema),
   asyncHandler(fundraisersController.updateFundraiser)
 );
+router.put(
+  '/:id',
+  authorize(ROLES.COLLEGE_ADMIN),
+  validate(updateFundraiserSchema),
+  asyncHandler(fundraisersController.updateFundraiser)
+);
 
 router.post(
   '/:id/tasks',

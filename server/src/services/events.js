@@ -14,10 +14,25 @@ const eventsService = {
    * @param {object} eventData
    */
   createEvent: async (collegeId, creatorId, eventData) => {
-    const isPaid = Boolean(eventData.is_paid);
+    const name = eventData.name || eventData.title;
+    const location = eventData.location || eventData.venue;
+    const isPaid = Boolean(eventData.is_paid || (eventData.price && Number(eventData.price) > 0));
+    const regularPrice = eventData.non_member_price !== undefined ? parseFloat(eventData.non_member_price) : (eventData.price !== undefined ? parseFloat(eventData.price) : 0);
+    const nonMemberPrice = isPaid ? regularPrice : 0;
     const memberPrice = isPaid ? parseFloat(eventData.member_price || 0) : 0;
-    const nonMemberPrice = isPaid ? parseFloat(eventData.non_member_price || 0) : 0;
-    const eventDate = typeof eventData.event_date === 'string' ? eventData.event_date.split('T')[0] : eventData.event_date;
+    
+    let eventDate = eventData.event_date;
+    let startTime = eventData.start_time || '10:00:00';
+    if (typeof eventDate === 'string') {
+      if (eventDate.includes('T')) {
+        const parts = eventDate.split('T');
+        eventDate = parts[0];
+        if (parts[1] && !eventData.start_time) {
+          startTime = parts[1].substring(0, 8);
+          if (startTime.length === 5) startTime += ':00';
+        }
+      }
+    }
 
     if (isPaid && nonMemberPrice <= 0) {
       throw new AppError('Paid events must specify a valid non-member price greater than 0', 400);
@@ -27,11 +42,16 @@ const eventsService = {
       return eventModel.create(
         collegeId,
         {
-          ...eventData,
+          name,
+          description: eventData.description || null,
           event_date: eventDate,
+          start_time: startTime,
+          location,
+          capacity: parseInt(eventData.capacity, 10),
           is_paid: isPaid,
           member_price: memberPrice,
           non_member_price: nonMemberPrice,
+          status: eventData.status || 'published',
           created_by: creatorId
         },
         trx
@@ -95,7 +115,7 @@ const eventsService = {
 
   /**
    * Updates an event within the college.
-   * Organizers can only edit events they created; College Admins can edit any.
+   * Organizers and College Admins can edit college events.
    */
   updateEvent: async (id, collegeId, user, updateData) => {
     const event = await eventModel.findById(id, collegeId);
@@ -103,16 +123,57 @@ const eventsService = {
       throw new AppError('Event not found', 404);
     }
 
-    if (user.role === ROLES.ORGANIZER && event.created_by !== user.id) {
-      throw new AppError('Organizers can only edit events they created', 403);
+    const cleanData = {};
+    if (updateData.name || updateData.title) {
+      cleanData.name = updateData.name || updateData.title;
+    }
+    if (updateData.description !== undefined) {
+      cleanData.description = updateData.description;
+    }
+    if (updateData.location || updateData.venue) {
+      cleanData.location = updateData.location || updateData.venue;
+    }
+    if (updateData.capacity !== undefined) {
+      cleanData.capacity = parseInt(updateData.capacity, 10);
+    }
+    if (updateData.event_date) {
+      let eventDate = updateData.event_date;
+      if (typeof eventDate === 'string' && eventDate.includes('T')) {
+        const parts = eventDate.split('T');
+        cleanData.event_date = parts[0];
+        if (parts[1] && !updateData.start_time) {
+          cleanData.start_time = parts[1].substring(0, 8);
+          if (cleanData.start_time.length === 5) cleanData.start_time += ':00';
+        }
+      } else {
+        cleanData.event_date = eventDate;
+      }
+    }
+    if (updateData.start_time) {
+      cleanData.start_time = updateData.start_time;
+      if (cleanData.start_time.length === 5) cleanData.start_time += ':00';
     }
 
-    return eventModel.update(id, collegeId, updateData);
+    if (updateData.non_member_price !== undefined || updateData.price !== undefined) {
+      cleanData.non_member_price = parseFloat(updateData.non_member_price ?? updateData.price ?? 0);
+      cleanData.is_paid = cleanData.non_member_price > 0;
+    }
+    if (updateData.member_price !== undefined) {
+      cleanData.member_price = parseFloat(updateData.member_price);
+    }
+    if (updateData.is_paid !== undefined) {
+      cleanData.is_paid = Boolean(updateData.is_paid);
+    }
+    if (updateData.status) {
+      cleanData.status = updateData.status;
+    }
+
+    return eventModel.update(id, collegeId, cleanData);
   },
 
   /**
    * Cancels an event.
-   * Organizers can only cancel events they created; College Admins can cancel any.
+   * Organizers and College Admins can cancel college events.
    */
   cancelEvent: async (id, collegeId, user) => {
     const event = await eventModel.findById(id, collegeId);
@@ -120,11 +181,7 @@ const eventsService = {
       throw new AppError('Event not found', 404);
     }
 
-    if (user.role === ROLES.ORGANIZER && event.created_by !== user.id) {
-      throw new AppError('Organizers can only cancel events they created', 403);
-    }
-
-    return eventModel.cancel(id, collegeId);
+    return eventModel.update(id, collegeId, { status: 'cancelled' });
   }
 };
 

@@ -17,10 +17,10 @@ app.use(helmet());
 // CORS configuration
 app.use(cors());
 
-// HTTP request logger
-if (env.NODE_ENV !== 'test') {
-  app.use(morgan('dev'));
-}
+// HTTP request logger (commented out to keep terminal clean)
+// if (env.NODE_ENV !== 'test') {
+//   app.use(morgan('dev'));
+// }
 
 // Global Rate Limiter
 const globalLimiter = rateLimit({
