@@ -1,0 +1,40 @@
+const express = require('express');
+const authRoutes = require('./auth');
+const collegesRoutes = require('./colleges');
+const collegeAdminsRoutes = require('./collegeAdmins');
+const organizersRoutes = require('./organizers');
+const usersRoutes = require('./users');
+const membershipsRoutes = require('./memberships');
+const eventsRoutes = require('./events');
+const registrationsRoutes = require('./registrations');
+const ticketsRoutes = require('./tickets');
+const paymentsRoutes = require('./payments');
+const announcementsRoutes = require('./announcements');
+const productsRoutes = require('./products');
+const ordersRoutes = require('./orders');
+const fundraisersRoutes = require('./fundraisers');
+const expensesRoutes = require('./expenses');
+const financeRoutes = require('./finance');
+const reportsRoutes = require('./reports');
+
+const router = express.Router();
+
+router.use('/auth', authRoutes);
+router.use('/colleges', collegesRoutes);
+router.use('/super-admin/college-admins', collegeAdminsRoutes);
+router.use('/organizers', organizersRoutes);
+router.use('/users', usersRoutes);
+router.use('/memberships', membershipsRoutes);
+router.use('/events', eventsRoutes);
+router.use('/registrations', registrationsRoutes);
+router.use('/tickets', ticketsRoutes);
+router.use('/payments', paymentsRoutes);
+router.use('/announcements', announcementsRoutes);
+router.use('/products', productsRoutes);
+router.use('/orders', ordersRoutes);
+router.use('/fundraisers', fundraisersRoutes);
+router.use('/expenses', expensesRoutes);
+router.use('/finance', financeRoutes);
+router.use('/reports', reportsRoutes);
+
+module.exports = router;
