@@ -2,12 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Building2, School } from 'lucide-react';
 import { Wizard } from '@/components/ui/Wizard';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
 import { createWizardStore } from '@/stores/wizard';
+import { useAuthStore } from '@/stores/auth';
 import { authApi } from '@/api/auth';
 import { collegesApi } from '@/api/colleges';
 
@@ -18,39 +18,129 @@ const accountSchema = z
     email: z.string().email('Valid email is required'),
     password: z.string().min(6, 'Password must be at least 6 characters'),
     confirmPassword: z.string().min(6, 'Please confirm your password'),
+    college_id: z.string().min(1, 'Email must belong to an affiliated college campus'),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
     path: ['confirmPassword'],
   });
 
-// Step 2: College schema
+// Step 2: College schema (no manual college selection needed)
 const collegeSchema = z.object({
-  college_id: z.string().min(1, 'Please select your college'),
   department: z.string().min(2, 'Department is required'),
   graduation_year: z.string().min(4, 'Graduation year is required'),
 });
 
-// Step 1 Component
+// Step 1 Component: Account & Auto-Campus Identification
 const AccountStep = ({ formData, updateFormData, errors }) => {
+  const [colleges, setColleges] = useState([]);
+  const [loadingColleges, setLoadingColleges] = useState(true);
+
+  useEffect(() => {
+    collegesApi
+      .getPublic()
+      .then((res) => {
+        const list = res.data || [];
+        setColleges(list);
+      })
+      .catch((err) => console.error('Failed to load colleges', err))
+      .finally(() => setLoadingColleges(false));
+  }, []);
+
+  const email = formData.email ? formData.email.trim() : '';
+  const emailDomain = email.includes('@') ? email.split('@')[1]?.toLowerCase().trim() : '';
+
+  const matchedCollege = colleges.find(
+    (c) =>
+      c.domain &&
+      emailDomain &&
+      (emailDomain === c.domain.toLowerCase() || emailDomain.endsWith('.' + c.domain.toLowerCase()))
+  );
+
+  const handleEmailChange = (val) => {
+    const inputVal = val.trim();
+    const domainPart = inputVal.includes('@') ? inputVal.split('@')[1]?.toLowerCase().trim() : '';
+
+    const matched = colleges.find(
+      (c) =>
+        c.domain &&
+        domainPart &&
+        (domainPart === c.domain.toLowerCase() || domainPart.endsWith('.' + c.domain.toLowerCase()))
+    );
+
+    if (matched) {
+      updateFormData({
+        email: inputVal,
+        college_id: String(matched.id),
+        college_name: matched.name,
+        college_domain: matched.domain,
+      });
+    } else {
+      updateFormData({
+        email: inputVal,
+        college_id: '',
+        college_name: '',
+        college_domain: '',
+      });
+    }
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 text-left">
       <FormField label="Full Name" required error={errors.name}>
         <Input
           placeholder="e.g. Diya Sharma"
           value={formData.name || ''}
           onChange={(e) => updateFormData({ name: e.target.value })}
+          autoFocus
         />
       </FormField>
 
-      <FormField label="College Email" required error={errors.email}>
+      <FormField
+        label="Institutional College Email"
+        required
+        error={errors.email || (!formData.college_id && emailDomain ? errors.college_id : undefined)}
+        hint="Enter your official college email address (e.g. student@ldce.ac.in or student@skyline.edu)"
+      >
         <Input
           type="email"
-          placeholder="diya@skyline.edu"
+          placeholder="student@campus.edu"
           value={formData.email || ''}
-          onChange={(e) => updateFormData({ email: e.target.value })}
+          onChange={(e) => handleEmailChange(e.target.value)}
         />
       </FormField>
+
+      {/* Real-time Campus Detection Feedback */}
+      {emailDomain && (
+        <div>
+          {matchedCollege ? (
+            <div className="p-3 bg-success/10 border border-success/30 rounded-lg text-xs text-success flex items-start gap-2.5">
+              <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block text-sm">
+                  Campus Identified: {matchedCollege.name}
+                </span>
+                <span className="text-[11px] opacity-90 block mt-0.5">
+                  Verified institutional domain (@{matchedCollege.domain}). Tenancy assigned automatically.
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 bg-danger/10 border border-danger/30 rounded-lg text-xs text-danger flex items-start gap-2.5">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">
+                  Unrecognized Campus Domain (@{emailDomain})
+                </span>
+                <span className="text-[11px] opacity-90 block mt-0.5">
+                  Only students with recognized institutional email addresses can create an account.
+                  Please use your official college email.
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Password" required error={errors.password}>
@@ -75,47 +165,36 @@ const AccountStep = ({ formData, updateFormData, errors }) => {
   );
 };
 
-// Step 2 Component
+// Step 2 Component: Academic Details (Campus already auto-identified)
 const CollegeStep = ({ formData, updateFormData, errors }) => {
-  const [colleges, setColleges] = useState([]);
-  const [loadingColleges, setLoadingColleges] = useState(true);
-
-  useEffect(() => {
-    collegesApi
-      .getPublic()
-      .then((res) => {
-        const list = res.data || [];
-        setColleges(list);
-        if (list.length > 0 && !formData.college_id) {
-          updateFormData({ college_id: String(list[0].id) });
-        }
-      })
-      .catch((err) => console.error('Failed to load colleges', err))
-      .finally(() => setLoadingColleges(false));
-  }, []);
-
   return (
-    <div className="space-y-4">
-      <FormField label="Select College / Campus" required error={errors.college_id}>
-        <Select
-          value={formData.college_id || ''}
-          onChange={(e) => updateFormData({ college_id: e.target.value })}
-          disabled={loadingColleges}
-        >
-          {colleges.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name} ({c.code})
-            </option>
-          ))}
-        </Select>
-      </FormField>
+    <div className="space-y-5 text-left">
+      {/* Auto-identified Campus Card */}
+      <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl flex items-start gap-3.5">
+        <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+          <Building2 className="h-5 w-5" />
+        </div>
+        <div className="space-y-0.5">
+          <span className="text-[11px] font-bold text-primary uppercase tracking-wider block">
+            Auto-Identified Campus
+          </span>
+          <h4 className="text-base font-bold text-ink leading-snug">
+            {formData.college_name || 'Campus Institution'}
+          </h4>
+          <p className="text-xs text-muted flex items-center gap-1.5 mt-1">
+            <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
+            <span>Verified through {formData.email}</span>
+          </p>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Department / Major" required error={errors.department}>
           <Input
-            placeholder="e.g. Computer Science"
+            placeholder="e.g. Computer Science & Engineering"
             value={formData.department || ''}
             onChange={(e) => updateFormData({ department: e.target.value })}
+            autoFocus
           />
         </FormField>
 
@@ -131,18 +210,22 @@ const CollegeStep = ({ formData, updateFormData, errors }) => {
   );
 };
 
-// Step 3 Component
+// Step 3 Component: Review
 const ReviewStep = ({ formData }) => {
   return (
-    <div className="space-y-4 text-sm">
-      <div className="p-4 rounded-md bg-canvas border border-line space-y-2">
+    <div className="space-y-4 text-sm text-left">
+      <div className="p-4 rounded-lg bg-canvas border border-line space-y-2.5">
         <div className="flex justify-between py-1 border-b border-line">
           <span className="text-muted">Full Name</span>
           <span className="font-semibold text-ink">{formData.name}</span>
         </div>
         <div className="flex justify-between py-1 border-b border-line">
-          <span className="text-muted">Email</span>
+          <span className="text-muted">Institutional Email</span>
           <span className="font-semibold text-ink">{formData.email}</span>
+        </div>
+        <div className="flex justify-between py-1 border-b border-line">
+          <span className="text-muted">Assigned Campus</span>
+          <span className="font-bold text-primary">{formData.college_name}</span>
         </div>
         <div className="flex justify-between py-1 border-b border-line">
           <span className="text-muted">Department</span>
@@ -161,7 +244,7 @@ const ReviewStep = ({ formData }) => {
   );
 };
 
-// Step 4 Component
+// Step 4 Component: Done
 const DoneStep = () => {
   return (
     <div className="text-center py-6">
@@ -170,7 +253,7 @@ const DoneStep = () => {
       </div>
       <h3 className="text-xl font-bold text-ink mb-1">Registration Complete!</h3>
       <p className="text-sm text-muted max-w-sm mx-auto">
-        Your student association account has been created. You can now sign in and explore campus events.
+        Your student association account is activated and you are logged in. Click below to enter your student portal.
       </p>
     </div>
   );
@@ -178,6 +261,8 @@ const DoneStep = () => {
 
 export const Register = () => {
   const navigate = useNavigate();
+  const { setAuth } = useAuthStore();
+
   const registerStore = useMemo(
     () =>
       createWizardStore({
@@ -186,6 +271,8 @@ export const Register = () => {
         password: '',
         confirmPassword: '',
         college_id: '',
+        college_name: '',
+        college_domain: '',
         department: '',
         graduation_year: '2026',
       }),
@@ -196,14 +283,14 @@ export const Register = () => {
     {
       id: 'account',
       title: 'Create Your Account',
-      subtitle: 'Enter your basic student details',
+      subtitle: 'Enter your name and official campus email',
       schema: accountSchema,
       component: AccountStep,
     },
     {
       id: 'college',
       title: 'College Affiliation',
-      subtitle: 'Specify your campus and academic department',
+      subtitle: 'Specify your academic department & year',
       schema: collegeSchema,
       component: CollegeStep,
     },
@@ -223,13 +310,22 @@ export const Register = () => {
 
   const handleSubmit = async (data) => {
     try {
-      await authApi.register({
+      const res = await authApi.register({
         name: data.name,
         email: data.email,
         password: data.password,
-        college_id: Number(data.college_id),
+        college_id: data.college_id ? Number(data.college_id) : undefined,
       });
-      toast.success('Account created successfully!');
+
+      const token = res.data?.token || res.token;
+      const user = res.data?.user || res.user;
+
+      if (token && user) {
+        setAuth(token, user);
+        toast.success(`Welcome, ${user.name}! Your account is active.`);
+      } else {
+        toast.success('Account created successfully!');
+      }
     } catch (err) {
       toast.error(err?.message || 'Registration failed.');
       throw err;
@@ -237,14 +333,14 @@ export const Register = () => {
   };
 
   return (
-    <div className="py-12">
+    <div className="py-12 max-w-xl mx-auto px-4">
       <Wizard
         steps={steps}
         store={registerStore}
         onSubmit={handleSubmit}
-        onDone={() => navigate('/login')}
+        onDone={() => navigate('/apps', { replace: true })}
         confirmButtonText="Confirm Registration"
-        doneButtonText="Proceed to Login"
+        doneButtonText="Enter Student Portal"
       />
       <p className="text-center text-xs text-muted mt-4">
         Already registered?{' '}

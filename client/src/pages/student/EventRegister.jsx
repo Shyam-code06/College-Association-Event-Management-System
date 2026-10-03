@@ -36,19 +36,24 @@ const EventStep = ({ formData }) => {
 // Step 2: Price Step
 const PriceStep = ({ formData }) => {
   const event = formData.event || {};
-  const isMember = formData.isMember;
-  const applicablePrice = isMember ? Number(event.member_price || 0) : Number(event.price || 0);
+  const isMember = Boolean(formData.isMember);
+  const membership = formData.membership;
+  const standardPrice = Number(event.non_member_price ?? event.price ?? 0);
+  const memberPrice = Number(event.member_price ?? 0);
+  const applicablePrice = isMember ? memberPrice : standardPrice;
 
   return (
     <div className="space-y-4 text-sm">
       <div className="p-4 rounded-md bg-canvas border border-line space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-muted">Membership Tier</span>
-          <span className="font-semibold text-ink flex items-center gap-1">
+          <span className="font-semibold text-ink flex items-center gap-1.5">
             {isMember ? (
               <>
                 <Award className="h-4 w-4 text-primary" />
-                Active Association Member
+                <span className="text-primary font-bold">
+                  {membership?.plan_name ? `${membership.plan_name} (Active Member)` : 'Active Association Member'}
+                </span>
               </>
             ) : (
               'Non-Member'
@@ -58,10 +63,8 @@ const PriceStep = ({ formData }) => {
 
         <div className="flex items-center justify-between">
           <span className="text-muted">Standard Registration Fee</span>
-          <span className="text-muted line-through">
-            {isMember && Number(event.price) > applicablePrice
-              ? formatCurrency(event.price)
-              : ''}
+          <span className={`text-muted ${isMember && standardPrice > applicablePrice ? 'line-through' : ''}`}>
+            {formatCurrency(standardPrice)}
           </span>
         </div>
 
@@ -73,9 +76,13 @@ const PriceStep = ({ formData }) => {
         </div>
       </div>
 
-      {isMember && (
+      {isMember ? (
         <p className="text-xs text-secondary font-medium text-center">
-          ✓ Association member discount rate applied automatically.
+          ✓ Association member rate ({formatCurrency(memberPrice)}) applied automatically.
+        </p>
+      ) : (
+        <p className="text-xs text-muted text-center">
+          Standard non-member rate applies. Join association membership to unlock member discount!
         </p>
       )}
     </div>
@@ -85,8 +92,10 @@ const PriceStep = ({ formData }) => {
 // Step 3: Payment Step
 const PaymentStep = ({ formData }) => {
   const event = formData.event || {};
-  const isMember = formData.isMember;
-  const applicablePrice = isMember ? Number(event.member_price || 0) : Number(event.price || 0);
+  const isMember = Boolean(formData.isMember);
+  const standardPrice = Number(event.non_member_price ?? event.price ?? 0);
+  const memberPrice = Number(event.member_price ?? 0);
+  const applicablePrice = isMember ? memberPrice : standardPrice;
 
   return (
     <div className="space-y-4 text-center py-2">
@@ -141,6 +150,7 @@ export const EventRegister = () => {
       createWizardStore({
         eventId: id,
         event: null,
+        membership: null,
         isMember: false,
         qrDataUrl: null,
       }),
@@ -154,10 +164,14 @@ export const EventRegister = () => {
     ]).then(([evRes, memRes]) => {
       const evData = evRes.status === 'fulfilled' ? evRes.value?.data : null;
       const memData = memRes.status === 'fulfilled' ? memRes.value?.data : null;
-      const isMember = memData?.status === 'ACTIVE';
+      const isMember = Boolean(
+        memData?.isActive ||
+        String(memData?.status).toUpperCase() === 'ACTIVE'
+      );
 
       wizardStore.getState().updateFormData({
         event: evData,
+        membership: memData,
         isMember,
       });
       setLoadingEvent(false);
@@ -194,20 +208,25 @@ export const EventRegister = () => {
   const handleSubmit = async (_formData) => {
     try {
       const regRes = await eventsApi.register(id);
-      const registration = regRes.data;
+      const regData = regRes.data || {};
+      const registration = regData.registration || regData;
+      const paymentId = regData.payment?.id || regData.payment_id || registration.payment_id;
 
       // If a payment is required, process it
-      if (registration.payment_id) {
-        await paymentsApi.process(registration.payment_id, true);
+      if (paymentId) {
+        await paymentsApi.process(paymentId, true);
       }
 
       // Fetch the generated QR code
-      try {
-        const qrRes = await ticketsApi.getQrCode(registration.id);
-        const qr = qrRes.data?.qrDataUrl || qrRes.data?.qrCode || qrRes.qrDataUrl;
-        wizardStore.getState().updateFormData({ qrDataUrl: qr });
-      } catch (qrErr) {
-        console.warn('QR fetch delayed:', qrErr);
+      const regId = registration?.id || regData.id;
+      if (regId) {
+        try {
+          const qrRes = await ticketsApi.getQrCode(regId);
+          const qr = qrRes.data?.qrDataUrl || qrRes.data?.qrCode || qrRes.qrDataUrl;
+          wizardStore.getState().updateFormData({ qrDataUrl: qr });
+        } catch (qrErr) {
+          console.warn('QR fetch delayed:', qrErr);
+        }
       }
 
       toast.success('Registration successful!');

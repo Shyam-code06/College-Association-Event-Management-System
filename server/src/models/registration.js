@@ -33,6 +33,10 @@ const registrationModel = {
   },
 
   findByQrToken: async (qrToken, collegeId, trx = db) => {
+    const raw = String(qrToken || '').trim();
+    const numericStr = raw.startsWith('#') ? raw.slice(1) : raw;
+    const isNumeric = /^\d+$/.test(numericStr);
+
     let query = trx('registrations')
       .select(
         'registrations.*',
@@ -42,8 +46,16 @@ const registrationModel = {
         'users.email as user_email'
       )
       .join('events', 'registrations.event_id', 'events.id')
-      .join('users', 'registrations.user_id', 'users.id')
-      .where('registrations.qr_token', qrToken);
+      .join('users', 'registrations.user_id', 'users.id');
+
+    if (isNumeric) {
+      query = query.where((qb) => {
+        qb.where('registrations.qr_token', raw)
+          .orWhere('registrations.id', parseInt(numericStr, 10));
+      });
+    } else {
+      query = query.where('registrations.qr_token', raw);
+    }
 
     query = applyTenantScope(query, collegeId, 'registrations');
     return query.first();

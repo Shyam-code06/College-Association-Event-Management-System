@@ -29,13 +29,42 @@ const authService = {
    * @returns {Promise<{ token: string, user: object }>}
    */
   registerStudent: async ({ name, email, password, college_id }) => {
-    // 1. Verify college exists and is active
-    const college = await collegeModel.findById(college_id);
-    if (!college || !college.is_active || college.deleted_at !== null) {
-      throw new AppError('The selected college is invalid, inactive, or disabled', 400);
+    let targetCollegeId = college_id;
+    const emailDomain = email.split('@')[1]?.toLowerCase().trim();
+
+    // Auto-resolve college from email domain
+    const activeColleges = await collegeModel.findAllActive();
+    const matchedCollege = activeColleges.find(
+      (c) => c.domain && (emailDomain === c.domain.toLowerCase() || emailDomain.endsWith('.' + c.domain.toLowerCase()))
+    );
+
+    if (matchedCollege) {
+      targetCollegeId = matchedCollege.id;
+    } else if (targetCollegeId) {
+      const college = await collegeModel.findById(targetCollegeId);
+      if (college && college.domain) {
+        const allowed = college.domain.toLowerCase().trim();
+        if (emailDomain !== allowed && !emailDomain.endsWith('.' + allowed)) {
+          throw new AppError(
+            `Only institutional email addresses ending with @${college.domain} are eligible for ${college.name}. Please use your official campus email.`,
+            400
+          );
+        }
+      }
+    } else {
+      throw new AppError(
+        `Email domain '@${emailDomain}' is not affiliated with any recognized college campus. Please register using your official college email address.`,
+        400
+      );
     }
 
-    // 2. Verify email is unique
+    // 1. Verify college exists and is active
+    const college = await collegeModel.findById(targetCollegeId);
+    if (!college || !college.is_active || college.deleted_at !== null) {
+      throw new AppError('The recognized college is invalid, inactive, or disabled', 400);
+    }
+
+    // 3. Verify email is unique
     const existingUser = await userModel.findByEmail(email);
     if (existingUser) {
       throw new AppError('An account with this email address already exists', 409);

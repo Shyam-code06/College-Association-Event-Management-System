@@ -37,6 +37,11 @@ export const StudentDashboard = () => {
     });
   }, []);
 
+  const isMember = Boolean(
+    membership?.isActive ||
+    String(membership?.status).toUpperCase() === 'ACTIVE'
+  );
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Welcome Banner */}
@@ -69,7 +74,7 @@ export const StudentDashboard = () => {
             onClick={() => navigate('/student/membership')}
             icon={Award}
           >
-            {membership?.status === 'ACTIVE' ? 'My Plan' : 'Join Association'}
+            {isMember ? 'My Plan' : 'Join Association'}
           </Button>
         </div>
       </div>
@@ -78,10 +83,10 @@ export const StudentDashboard = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard
           title="Membership Status"
-          value={membership?.status === 'ACTIVE' ? 'Active Member' : 'Non-Member'}
-          subtitle={membership ? `${membership.plan_name || 'Association Plan'}` : 'Upgrade to get discounts'}
+          value={isMember ? 'Active Member' : 'Non-Member'}
+          subtitle={isMember && membership?.plan_name ? membership.plan_name : (isMember ? 'Association Plan' : 'Upgrade to get discounts')}
           icon={Award}
-          indicator={membership?.status === 'ACTIVE' ? 'success' : 'default'}
+          indicator={isMember ? 'success' : 'default'}
         />
         <StatCard
           title="Active Tickets"
@@ -92,7 +97,7 @@ export const StudentDashboard = () => {
         />
         <StatCard
           title="Merch Discount"
-          value={membership?.merch_discount_percent ? `${membership.merch_discount_percent}% OFF` : '0%'}
+          value={isMember && membership?.merch_discount_percent ? `${membership.merch_discount_percent}% OFF` : '0%'}
           subtitle="Exclusive store savings"
           icon={ShoppingBag}
           indicator="secondary"

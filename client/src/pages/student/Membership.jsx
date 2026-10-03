@@ -256,7 +256,12 @@ export const Membership = () => {
     }
   };
 
-  if (!loading && (currentMembership?.status === 'ACTIVE' || currentMembership?.isActive)) {
+  const isMembershipActive = Boolean(
+    currentMembership?.isActive ||
+    String(currentMembership?.status).toUpperCase() === 'ACTIVE'
+  );
+
+  if (!loading && isMembershipActive) {
     return (
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="bg-surface border border-line rounded-lg p-8 shadow-card text-center space-y-6">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   BarChart2,
   Users,
@@ -7,6 +7,8 @@ import {
   IndianRupee,
   Download,
   Loader2,
+  Calendar,
+  Plus,
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import jsPDF from 'jspdf';
@@ -17,11 +19,13 @@ import { StatCard } from '@/components/ui/StatCard';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { eventsApi } from '@/api/events';
 import { reportsApi } from '@/api/reports';
 import { formatCurrency } from '@/utils/format';
 
 export const EventReport = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialEventId = searchParams.get('eventId') || '';
 
@@ -29,21 +33,36 @@ export const EventReport = () => {
   const [selectedEventId, setSelectedEventId] = useState(initialEventId);
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const reportRef = useRef(null);
 
   useEffect(() => {
-    eventsApi.list({ limit: 50 }).then((res) => {
-      const list = res.data || [];
-      setEvents(list);
-      if (!selectedEventId && list.length > 0) {
-        setSelectedEventId(String(list[0].id));
-      }
-    });
+    eventsApi
+      .list({ limit: 50 })
+      .then((res) => {
+        const list = res.data || [];
+        setEvents(list);
+        if (list.length > 0) {
+          if (!selectedEventId) {
+            setSelectedEventId(String(list[0].id));
+          }
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load events', err);
+        setLoading(false);
+      })
+      .finally(() => setEventsLoading(false));
   }, []);
 
   useEffect(() => {
-    if (!selectedEventId) return;
+    if (!selectedEventId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     reportsApi
       .getEventReport(selectedEventId)
@@ -115,34 +134,59 @@ export const EventReport = () => {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="w-full sm:w-64">
-            <Select
-              value={selectedEventId}
-              onChange={(e) => setSelectedEventId(e.target.value)}
-            >
-              {events.map((ev) => (
-                <option key={ev.id} value={ev.id}>
-                  {ev.title}
-                </option>
-              ))}
-            </Select>
-          </div>
+        {events.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="w-full sm:w-64">
+              <Select
+                value={selectedEventId}
+                onChange={(e) => setSelectedEventId(e.target.value)}
+              >
+                {events.map((ev) => (
+                  <option key={ev.id} value={ev.id}>
+                    {ev.title}
+                  </option>
+                ))}
+              </Select>
+            </div>
 
+            <Button
+              variant="primary"
+              size="md"
+              onClick={handleDownloadPdf}
+              disabled={loading || !report || isExporting}
+              icon={isExporting ? Loader2 : Download}
+              className={isExporting ? 'animate-pulse' : ''}
+            >
+              {isExporting ? 'Exporting...' : 'Download PDF'}
+            </Button>
+          </div>
+        ) : (
           <Button
             variant="primary"
             size="md"
-            onClick={handleDownloadPdf}
-            disabled={loading || !report || isExporting}
-            icon={isExporting ? Loader2 : Download}
-            className={isExporting ? 'animate-pulse' : ''}
+            onClick={() => navigate('/organizer/events/new')}
+            icon={Plus}
           >
-            {isExporting ? 'Exporting...' : 'Download PDF'}
+            Create Event
           </Button>
-        </div>
+        )}
       </div>
 
-      {loading ? (
+      {eventsLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-lg" />
+          ))}
+        </div>
+      ) : events.length === 0 ? (
+        <EmptyState
+          icon={Calendar}
+          title="No Campus Events Yet"
+          description="Your campus association has not created any events yet. Create an event to track turnout rates, gate scan attendance, and ticket revenue analytics."
+          actionLabel="Create First Event"
+          onAction={() => navigate('/organizer/events/new')}
+        />
+      ) : loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-28 rounded-lg" />

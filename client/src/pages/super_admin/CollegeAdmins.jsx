@@ -22,8 +22,13 @@ export const CollegeAdmins = () => {
   const confirmToggleAccess = async () => {
     if (!toggleTarget) return;
     try {
-      await superAdminApi.toggleAccess(toggleTarget.id);
-      toast.success(`Access updated for ${toggleTarget.name}`);
+      const nextState = !toggleTarget.is_active;
+      await superAdminApi.toggleAccess(toggleTarget.id, { isActive: nextState });
+      toast.success(
+        nextState
+          ? `Access granted for ${toggleTarget.name}`
+          : `Access revoked for ${toggleTarget.name}`
+      );
       setToggleTarget(null);
       setRefreshKey((k) => k + 1);
     } catch (err) {

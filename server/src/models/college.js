@@ -3,7 +3,7 @@ const db = require('../config/database');
 const collegeModel = {
   findAllActive: async (trx = db) => {
     return trx('colleges')
-      .select('id', 'name', 'code')
+      .select('id', 'name', 'code', 'domain')
       .where('is_active', true)
       .whereNull('deleted_at')
       .orderBy('name', 'asc');

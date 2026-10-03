@@ -51,9 +51,14 @@ const productsService = {
     const productsWithVariants = await Promise.all(
       products.map(async (prod) => {
         const variants = await productModel.findVariantsByProductId(prod.id, collegeId);
+        const mappedVariants = (variants || []).map((v) => ({
+          ...v,
+          stock: v.stock ?? v.stock_quantity ?? 0,
+          stock_quantity: v.stock ?? v.stock_quantity ?? 0
+        }));
         return {
           ...prod,
-          variants
+          variants: mappedVariants
         };
       })
     );
@@ -74,9 +79,14 @@ const productsService = {
     }
 
     const variants = await productModel.findVariantsByProductId(product.id, collegeId);
+    const mappedVariants = (variants || []).map((v) => ({
+      ...v,
+      stock: v.stock ?? v.stock_quantity ?? 0,
+      stock_quantity: v.stock ?? v.stock_quantity ?? 0
+    }));
     return {
       ...product,
-      variants
+      variants: mappedVariants
     };
   },
 

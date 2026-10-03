@@ -121,12 +121,12 @@ const membershipsService = {
 
     const today = new Date().toISOString().split('T')[0];
     const isCurrentlyActive =
-      membership.status === MEMBERSHIP_STATUS.ACTIVE &&
-      membership.dues_status === DUES_STATUS.PAID &&
+      String(membership.status).toLowerCase() === 'active' &&
+      String(membership.dues_status).toLowerCase() === 'paid' &&
       (!membership.expiry_date || membership.expiry_date >= today);
 
     let pendingPayment = null;
-    if (membership.status === MEMBERSHIP_STATUS.PENDING) {
+    if (String(membership.status).toLowerCase() === 'pending') {
       pendingPayment = await paymentModel.findByPayable(
         PAYABLE_TYPE.MEMBERSHIP,
         membership.id,
@@ -138,7 +138,8 @@ const membershipsService = {
       ...membership,
       hasMembership: true,
       isActive: isCurrentlyActive,
-      status: isCurrentlyActive ? MEMBERSHIP_STATUS.ACTIVE : membership.status,
+      status: isCurrentlyActive ? 'ACTIVE' : (membership.status ? String(membership.status).toUpperCase() : 'PENDING'),
+      rawStatus: membership.status,
       pendingPaymentId: pendingPayment ? pendingPayment.id : null,
       membership
     };

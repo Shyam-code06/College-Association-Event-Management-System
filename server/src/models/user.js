@@ -35,6 +35,7 @@ const userModel = {
         'colleges.id as college_id',
         'colleges.name as college_name',
         'colleges.code as college_code',
+        'colleges.domain as college_domain',
         'colleges.is_active as college_is_active'
       )
       .leftJoin('colleges', 'users.college_id', 'colleges.id')

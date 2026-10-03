@@ -3,6 +3,7 @@ const db = require('../config/database');
 const userModel = require('../models/user');
 const collegeModel = require('../models/college');
 const financeModel = require('../models/finance');
+const productModel = require('../models/product');
 const { ROLES } = require('../constants/roles');
 const { FINANCE_TYPE } = require('../constants/statuses');
 const AppError = require('../utils/appError');
@@ -33,29 +34,89 @@ const collegeAdminsService = {
    * @param {number} superAdminId
    * @param {object} payload
    */
-  createCollegeAdminWithCollege: async (superAdminId, { collegeName, collegeCode, adminName, adminEmail, adminPassword }) => {
+  createCollegeAdminWithCollege: async (superAdminId, { collegeId, collegeName, collegeCode, collegeDomain, adminName, adminEmail, adminPassword }) => {
     return db.transaction(async (trx) => {
-      // 1. Check unique college name/code
-      const existingCollege = await collegeModel.findByNameOrCode(collegeName, collegeCode, trx);
-      if (existingCollege) {
-        throw new AppError('A college with this name or code already exists', 409);
-      }
-
-      // 2. Check unique email
+      // 1. Check unique email for administrator
       const existingUser = await userModel.findByEmail(adminEmail, trx);
       if (existingUser) {
         throw new AppError('A user with this email address already exists', 409);
       }
 
-      // 3. Create College
-      const college = await collegeModel.create(
-        {
-          name: collegeName,
-          code: collegeCode,
-          is_active: true
-        },
-        trx
-      );
+      let college;
+      if (collegeId) {
+        college = await collegeModel.findById(collegeId, trx);
+        if (!college) {
+          throw new AppError('Selected college institution does not exist', 404);
+        }
+      } else {
+        // Auto-generate code from college name if not provided
+        let finalCode = (collegeCode || '').trim().toUpperCase();
+        if (!finalCode) {
+          const cleaned = collegeName.replace(/[^a-zA-Z0-9\s]/g, '').trim();
+          const words = cleaned.split(/\s+/).filter(Boolean);
+          if (words.length > 1) {
+            finalCode = words.map((w) => w[0]).join('').toUpperCase();
+          }
+          if (finalCode.length < 2) {
+            finalCode = cleaned.slice(0, 4).toUpperCase();
+          }
+          if (!finalCode) finalCode = 'CAMPUS';
+        }
+
+        // Ensure unique code
+        let uniqueCode = finalCode;
+        let suffix = 2;
+        while (await collegeModel.findByNameOrCode('', uniqueCode, trx)) {
+          uniqueCode = `${finalCode}${suffix}`;
+          suffix++;
+        }
+
+        // Check unique college name
+        const existingCollege = await collegeModel.findByNameOrCode(collegeName, uniqueCode, trx);
+        if (existingCollege && existingCollege.name.toLowerCase() === collegeName.toLowerCase()) {
+          throw new AppError('A college with this name already exists', 409);
+        }
+
+        // Determine official institutional email domain (e.g. ldce.ac.in)
+        let finalDomain = collegeDomain ? collegeDomain.trim().toLowerCase().replace(/^@/, '') : null;
+        if (!finalDomain && adminEmail) {
+          const emailParts = adminEmail.split('@')[1]?.toLowerCase().trim();
+          if (emailParts && !['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com'].includes(emailParts)) {
+            finalDomain = emailParts;
+          }
+        }
+
+        // Create New College with domain
+        college = await collegeModel.create(
+          {
+            name: collegeName.trim(),
+            code: uniqueCode,
+            domain: finalDomain,
+            is_active: true
+          },
+          trx
+        );
+
+        // Seed initial finance categories for this new college
+        for (const cat of DEFAULT_FINANCE_CATEGORIES) {
+          await financeModel.createCategory(college.id, cat, trx);
+        }
+
+        // Seed initial default merchandise products
+        const defaultTshirt = await productModel.create(
+          college.id,
+          {
+            name: `${college.name} Official Campus T-Shirt`,
+            description: '100% premium bio-wash cotton association edition t-shirt',
+            base_price: 399.00,
+            is_active: true
+          },
+          trx
+        );
+        for (const sz of ['S', 'M', 'L', 'XL']) {
+          await productModel.createVariant(college.id, { product_id: defaultTshirt.id, size: sz, stock: 30 }, trx);
+        }
+      }
 
       // 4. Create College Admin
       const password_hash = await bcrypt.hash(adminPassword, 10);
@@ -71,11 +132,6 @@ const collegeAdminsService = {
         },
         trx
       );
-
-      // 5. Seed initial finance categories for this college
-      for (const cat of DEFAULT_FINANCE_CATEGORIES) {
-        await financeModel.createCategory(college.id, cat, trx);
-      }
 
       return {
         id: admin.id,
@@ -180,11 +236,13 @@ const collegeAdminsService = {
         throw new AppError('Cannot modify access of a deleted administrator', 400);
       }
 
+      const targetStatus = isActive !== undefined ? Boolean(isActive) : !user.is_active;
+
       // Update College Admin
-      const updatedAdmin = await userModel.update(id, { is_active: isActive }, null, trx);
+      const updatedAdmin = await userModel.update(id, { is_active: targetStatus }, null, trx);
 
       // Update College (revoking access deactivates college, reactivating restores)
-      const updatedCollege = await collegeModel.update(user.college_id, { is_active: isActive }, trx);
+      const updatedCollege = await collegeModel.update(user.college_id, { is_active: targetStatus }, trx);
 
       return {
         id: updatedAdmin.id,

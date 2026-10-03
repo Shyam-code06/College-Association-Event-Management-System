@@ -28,6 +28,11 @@ const financeModel = {
   },
 
   createCategory: async (collegeId, data, trx = db) => {
+    const existing = await trx('finance_categories')
+      .where({ college_id: collegeId, name: data.name })
+      .first();
+    if (existing) return existing;
+
     const [id] = await trx('finance_categories').insert({
       college_id: collegeId,
       ...data

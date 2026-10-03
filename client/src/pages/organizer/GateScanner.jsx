@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import {
   QrCode,
@@ -8,6 +8,8 @@ import {
   Camera,
   Keyboard,
   Clock,
+  Calendar,
+  Plus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
@@ -15,15 +17,18 @@ import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { eventsApi } from '@/api/events';
 import { ticketsApi } from '@/api/tickets';
 
 export const GateScanner = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialEventId = searchParams.get('eventId') || '';
 
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState(initialEventId);
+  const [loadingEvents, setLoadingEvents] = useState(true);
   const [scanMode, setScanMode] = useState('camera'); // 'camera' | 'manual'
   const [manualToken, setManualToken] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -35,13 +40,19 @@ export const GateScanner = () => {
   const scannerRef = useRef(null);
 
   useEffect(() => {
-    eventsApi.list({ limit: 50 }).then((res) => {
-      const list = res.data || [];
-      setEvents(list);
-      if (!selectedEventId && list.length > 0) {
-        setSelectedEventId(String(list[0].id));
-      }
-    });
+    eventsApi
+      .list({ limit: 50 })
+      .then((res) => {
+        const list = res.data || [];
+        setEvents(list);
+        if (!selectedEventId && list.length > 0) {
+          setSelectedEventId(String(list[0].id));
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load events for scanner', err);
+      })
+      .finally(() => setLoadingEvents(false));
   }, []);
 
   const handleVerifyToken = async (token) => {
@@ -150,28 +161,42 @@ export const GateScanner = () => {
         </div>
       </div>
 
-      {/* Mode Toggle Buttons */}
-      <div className="flex items-center gap-2 border-b border-line pb-3">
-        <Button
-          variant={scanMode === 'camera' ? 'primary' : 'outline'}
-          size="sm"
-          onClick={() => setScanMode('camera')}
-          icon={Camera}
-        >
-          Camera Scanner
-        </Button>
-        <Button
-          variant={scanMode === 'manual' ? 'primary' : 'outline'}
-          size="sm"
-          onClick={() => setScanMode('manual')}
-          icon={Keyboard}
-        >
-          Manual Token Entry
-        </Button>
-      </div>
+      {loadingEvents ? (
+        <Card className="p-8 text-center bg-surface border border-line">
+          <p className="text-xs text-muted">Loading campus events...</p>
+        </Card>
+      ) : events.length === 0 ? (
+        <EmptyState
+          icon={Calendar}
+          title="No Campus Events Found"
+          description="There are currently no events created for this campus. Please create an event first to start scanning tickets and checking in attendees."
+          actionLabel="Create Event"
+          onAction={() => navigate('/organizer/events/new')}
+        />
+      ) : (
+        <>
+          {/* Mode Toggle Buttons */}
+          <div className="flex items-center gap-2 border-b border-line pb-3">
+            <Button
+              variant={scanMode === 'camera' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setScanMode('camera')}
+              icon={Camera}
+            >
+              Camera Scanner
+            </Button>
+            <Button
+              variant={scanMode === 'manual' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setScanMode('manual')}
+              icon={Keyboard}
+            >
+              Manual Token Entry
+            </Button>
+          </div>
 
-      {/* Main Scanner Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Main Scanner Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left: Scanner / Input */}
         <Card className="p-6 bg-surface border border-line rounded-lg shadow-card flex flex-col items-center justify-center">
           {scanMode === 'camera' ? (
@@ -307,6 +332,8 @@ export const GateScanner = () => {
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

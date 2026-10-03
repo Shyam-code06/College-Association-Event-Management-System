@@ -27,16 +27,32 @@ import { formatCurrency } from '@/utils/format';
 // Step 1: Product Step
 const ProductStep = ({ formData }) => {
   const product = formData.product || {};
+  const discountPercent = Number(formData.discountPercent) || 0;
+  const basePrice = Number(product.base_price || 0);
+  const discountedPrice = discountPercent > 0 ? basePrice * (1 - discountPercent / 100) : basePrice;
+
   return (
     <div className="space-y-4">
       <div className="p-4 rounded-md bg-canvas border border-line space-y-2">
         <h3 className="font-bold text-base text-ink">{product.name}</h3>
         <p className="text-xs text-muted leading-relaxed">{product.description}</p>
         <div className="flex items-center justify-between pt-2 border-t border-line text-xs">
-          <span className="text-muted">Base Price</span>
-          <span className="font-bold text-ink text-sm">
-            {formatCurrency(product.base_price || 0)}
-          </span>
+          <span className="text-muted">Item Price</span>
+          <div className="text-right">
+            {discountPercent > 0 ? (
+              <div className="flex items-center gap-2">
+                <span className="text-muted line-through">{formatCurrency(basePrice)}</span>
+                <span className="font-bold text-primary text-sm">{formatCurrency(discountedPrice)}</span>
+                <span className="text-[10px] font-bold bg-success/10 text-success px-1.5 py-0.5 rounded">
+                  {discountPercent}% Member Rate
+                </span>
+              </div>
+            ) : (
+              <span className="font-bold text-ink text-sm">
+                {formatCurrency(basePrice)}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -67,11 +83,14 @@ const SizeQuantityStep = ({ formData, updateFormData, errors }) => {
           }}
         >
           <option value="">-- Choose variant --</option>
-          {variants.map((v) => (
-            <option key={v.id} value={v.id} disabled={v.stock_quantity <= 0}>
-              {v.size || v.name} {v.stock_quantity <= 0 ? '(Out of stock)' : `(${v.stock_quantity} left)`}
-            </option>
-          ))}
+          {variants.map((v) => {
+            const currentStock = v.stock ?? v.stock_quantity ?? 0;
+            return (
+              <option key={v.id} value={v.id} disabled={currentStock <= 0}>
+                {v.size || v.name} {currentStock <= 0 ? '(Out of stock)' : `(${currentStock} left)`}
+              </option>
+            );
+          })}
         </Select>
       </FormField>
 
@@ -95,9 +114,9 @@ const ReviewOrderStep = ({ formData }) => {
   const quantity = Number(formData.quantity) || 1;
   const unitPrice = Number(variant.price || product.base_price || 0);
   const subtotal = unitPrice * quantity;
-  const discountPercent = formData.discountPercent || 0;
-  const discountAmount = (subtotal * discountPercent) / 100;
-  const total = subtotal - discountAmount;
+  const discountPercent = Number(formData.discountPercent) || 0;
+  const discountAmount = parseFloat(((subtotal * discountPercent) / 100).toFixed(2));
+  const total = parseFloat((subtotal - discountAmount).toFixed(2));
 
   return (
     <div className="space-y-4 text-sm">
@@ -117,8 +136,11 @@ const ReviewOrderStep = ({ formData }) => {
           <span className="text-ink">{formatCurrency(subtotal)}</span>
         </div>
         {discountPercent > 0 && (
-          <div className="flex justify-between py-1 border-b border-line text-secondary">
-            <span>Member Discount ({discountPercent}%)</span>
+          <div className="flex justify-between py-1 border-b border-line text-success font-medium">
+            <span className="flex items-center gap-1">
+              <Award className="h-3.5 w-3.5 text-success" />
+              Member Discount ({discountPercent}%)
+            </span>
             <span>- {formatCurrency(discountAmount)}</span>
           </div>
         )}
@@ -127,18 +149,32 @@ const ReviewOrderStep = ({ formData }) => {
           <span className="text-primary font-extrabold">{formatCurrency(total)}</span>
         </div>
       </div>
+      {discountPercent > 0 && (
+        <p className="text-xs text-secondary font-medium text-center">
+          ✓ Association active member discount applied to this order.
+        </p>
+      )}
     </div>
   );
 };
 
 // Step 4: Payment Step
-const PaymentOrderStep = ({ _formData }) => {
+const PaymentOrderStep = ({ formData }) => {
+  const product = formData?.product || {};
+  const variant = formData?.selectedVariant || {};
+  const quantity = Number(formData?.quantity) || 1;
+  const unitPrice = Number(variant.price || product.base_price || 0);
+  const subtotal = unitPrice * quantity;
+  const discountPercent = Number(formData?.discountPercent) || 0;
+  const discountAmount = (subtotal * discountPercent) / 100;
+  const total = subtotal - discountAmount;
+
   return (
     <div className="space-y-4 text-center py-2">
       <div className="h-12 w-12 rounded-pill bg-primary-soft text-primary flex items-center justify-center mx-auto mb-2">
         <CreditCard className="h-6 w-6" />
       </div>
-      <h4 className="font-bold text-base text-ink">Order Payment</h4>
+      <h4 className="font-bold text-base text-ink">Order Payment: {formatCurrency(total)}</h4>
       <p className="text-xs text-muted max-w-sm mx-auto">
         Simulated digital settlement for your official association merchandise order.
       </p>
@@ -174,8 +210,13 @@ export const MerchandiseStore = () => {
       if (prodRes.status === 'fulfilled') {
         setProducts(prodRes.value?.data || []);
       }
-      if (memRes.status === 'fulfilled' && memRes.value?.data?.status === 'ACTIVE') {
-        setDiscountPercent(memRes.value.data.merch_discount_percent || 10);
+      if (memRes.status === 'fulfilled' && memRes.value?.data) {
+        const mem = memRes.value.data;
+        const isMem = Boolean(mem.isActive || String(mem.status).toUpperCase() === 'ACTIVE');
+        if (isMem) {
+          const disc = Number(mem.merch_discount_percent ?? mem.membership?.merch_discount_percent ?? 10);
+          setDiscountPercent(disc);
+        }
       }
       setLoading(false);
     });
@@ -330,10 +371,12 @@ export const MerchandiseStore = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.map((prod) => {
             const totalStock = prod.variants?.reduce(
-              (acc, v) => acc + (v.stock_quantity || 0),
+              (acc, v) => acc + (v.stock ?? v.stock_quantity ?? 0),
               0
-            ) ?? prod.stock_quantity ?? 0;
+            ) ?? prod.stock ?? prod.stock_quantity ?? 0;
             const isOutOfStock = totalStock <= 0;
+            const basePrice = Number(prod.base_price || 0);
+            const memberPrice = discountPercent > 0 ? basePrice * (1 - discountPercent / 100) : basePrice;
 
             return (
               <Card
@@ -347,9 +390,25 @@ export const MerchandiseStore = () => {
 
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-bold text-base text-ink">{prod.name}</h3>
-                    <span className="font-extrabold text-base text-primary">
-                      {formatCurrency(prod.base_price)}
-                    </span>
+                    <div className="text-right">
+                      {discountPercent > 0 ? (
+                        <div>
+                          <span className="font-extrabold text-base text-primary">
+                            {formatCurrency(memberPrice)}
+                          </span>
+                          <span className="text-xs text-muted line-through ml-1.5">
+                            {formatCurrency(basePrice)}
+                          </span>
+                          <span className="block text-[10px] font-bold text-success">
+                            {discountPercent}% Member Rate
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="font-extrabold text-base text-primary">
+                          {formatCurrency(basePrice)}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <p className="text-xs text-muted line-clamp-2 mb-4 leading-relaxed">

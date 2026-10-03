@@ -77,8 +77,8 @@ const membershipModel = {
       )
       .leftJoin('membership_plans', 'memberships.plan_id', 'membership_plans.id')
       .where('memberships.user_id', userId)
-      .where('memberships.status', MEMBERSHIP_STATUS.ACTIVE)
-      .where('memberships.dues_status', DUES_STATUS.PAID)
+      .whereIn('memberships.status', ['active', 'ACTIVE'])
+      .whereIn('memberships.dues_status', ['paid', 'PAID'])
       .where(function () {
         this.whereNull('memberships.expiry_date').orWhere('memberships.expiry_date', '>=', today);
       });
