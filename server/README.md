@@ -177,7 +177,7 @@ All 18 tables are defined in a single file `database.sql` with InnoDB, `utf8mb4`
 ### Database Setup
 Run the single schema file into MySQL:
 ```bash
-mysql -u root -pshyam123 < database.sql
+mysql -u root -p(password) < database.sql
 ```
 
 ### Installation & Execution
