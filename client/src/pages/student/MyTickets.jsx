@@ -39,6 +39,7 @@ export const MyTickets = () => {
     try {
       const res = await ticketsApi.getQrCode(reg.id);
       const qrDataUrl = res.data?.qrDataUrl || res.data?.qrCode || res.qrDataUrl;
+      const qrToken = res.data?.qrToken || res.qrToken || reg.qr_token;
 
       setSelectedTicket({
         registration_id: reg.id,
@@ -46,6 +47,7 @@ export const MyTickets = () => {
         event_date: formatDateTime(reg.event_date),
         location: reg.venue || 'Campus Hall',
         qr_code_data_url: qrDataUrl,
+        qr_token: qrToken,
       });
       setIsQrModalOpen(true);
     } catch (err) {

@@ -194,14 +194,14 @@ export const GateScanner = () => {
             >
               <div className="text-center mb-4">
                 <Keyboard className="h-10 w-10 text-primary mx-auto mb-2" />
-                <h3 className="font-bold text-base text-ink">Enter Ticket Token</h3>
+                <h3 className="font-bold text-base text-ink">Enter Pass ID or Ticket Token</h3>
                 <p className="text-xs text-muted">
-                  Paste or type the alphanumeric QR token printed on the ticket pass
+                  Type the Pass ID (e.g. <strong>#3</strong>) or paste the alphanumeric QR token
                 </p>
               </div>
 
               <Input
-                placeholder="e.g. SKY-TKT-8f92b7c4"
+                placeholder="e.g. #3 or SKY-TKT-8f92b7c4"
                 value={manualToken}
                 onChange={(e) => setManualToken(e.target.value)}
                 disabled={isVerifying}
@@ -292,8 +292,8 @@ export const GateScanner = () => {
                         <span className="font-bold text-ink">
                           {scan.valid ? scan.attendee : scan.reason || 'Invalid'}
                         </span>
-                        <span className="block text-[10px] font-mono text-muted">
-                          {scan.token?.slice(0, 16)}...
+                        <span className="block text-[10px] font-mono text-muted break-all">
+                          {scan.token}
                         </span>
                       </div>
                     </div>
