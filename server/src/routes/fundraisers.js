@@ -33,6 +33,13 @@ router.patch(
   asyncHandler(fundraisersController.updateTaskStatus)
 );
 
+// Organizer or College Admin: list available students for volunteer assignments
+router.get(
+  '/volunteers/students',
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
+  asyncHandler(fundraisersController.listAvailableStudents)
+);
+
 // All college users can list and view fundraisers
 router.get(
   '/',

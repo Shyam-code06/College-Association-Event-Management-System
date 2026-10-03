@@ -79,7 +79,9 @@ const membershipModel = {
       .where('memberships.user_id', userId)
       .where('memberships.status', MEMBERSHIP_STATUS.ACTIVE)
       .where('memberships.dues_status', DUES_STATUS.PAID)
-      .where('memberships.expiry_date', '>=', today);
+      .where(function () {
+        this.whereNull('memberships.expiry_date').orWhere('memberships.expiry_date', '>=', today);
+      });
 
     query = applyTenantScope(query, collegeId, 'memberships');
     return query.first();
@@ -189,6 +191,29 @@ const membershipModel = {
     return trx('memberships')
       .where('status', MEMBERSHIP_STATUS.ACTIVE)
       .whereRaw('expiry_date < CURDATE()');
+  },
+
+  findActiveMembersByCollege: async (collegeId, trx = db) => {
+    const today = new Date().toISOString().split('T')[0];
+    let query = trx('memberships')
+      .select(
+        'users.id',
+        'users.name',
+        'users.email',
+        'membership_plans.name as plan_name'
+      )
+      .join('users', 'memberships.user_id', 'users.id')
+      .join('membership_plans', 'memberships.plan_id', 'membership_plans.id')
+      .where('memberships.status', MEMBERSHIP_STATUS.ACTIVE)
+      .where('memberships.dues_status', DUES_STATUS.PAID)
+      .where(function () {
+        this.whereNull('memberships.expiry_date').orWhere('memberships.expiry_date', '>=', today);
+      })
+      .where('users.is_active', true)
+      .whereNull('users.deleted_at');
+
+    query = applyTenantScope(query, collegeId, 'memberships');
+    return query.orderBy('users.name', 'asc');
   }
 };
 

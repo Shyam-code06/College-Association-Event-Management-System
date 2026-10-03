@@ -44,10 +44,16 @@ const membershipsService = {
         throw new AppError('Membership plan is invalid or inactive', 400);
       }
 
-      // 2. Check if student already has active membership
-      const activeMem = await membershipModel.getActiveMembership(userId, collegeId, trx);
-      if (activeMem) {
-        throw new AppError('You already have an active membership with Skyline', 400);
+      // 2. Check if student already has a membership
+      const existingMem = await membershipModel.findByUserId(userId, collegeId, trx);
+      if (existingMem) {
+        if (existingMem.status === MEMBERSHIP_STATUS.ACTIVE) {
+          throw new AppError('You already have an active membership with Skyline. You cannot join a second time.', 400);
+        }
+        if (existingMem.status === MEMBERSHIP_STATUS.PENDING) {
+          throw new AppError('You already have a pending membership request. Please complete your existing payment instead of joining again.', 400);
+        }
+        throw new AppError('You have already joined a membership with Skyline.', 400);
       }
 
       const fee = parseFloat(plan.fee);
@@ -98,6 +104,7 @@ const membershipsService = {
       return {
         membership,
         payment,
+        paymentId: payment ? payment.id : null,
         requiresPayment: !isFree
       };
     });
@@ -109,18 +116,30 @@ const membershipsService = {
   getMyMembership: async (userId, collegeId) => {
     const membership = await membershipModel.findByUserId(userId, collegeId);
     if (!membership) {
-      return { hasMembership: false, membership: null };
+      return { hasMembership: false, isActive: false, membership: null };
     }
 
     const today = new Date().toISOString().split('T')[0];
     const isCurrentlyActive =
       membership.status === MEMBERSHIP_STATUS.ACTIVE &&
       membership.dues_status === DUES_STATUS.PAID &&
-      membership.expiry_date >= today;
+      (!membership.expiry_date || membership.expiry_date >= today);
+
+    let pendingPayment = null;
+    if (membership.status === MEMBERSHIP_STATUS.PENDING) {
+      pendingPayment = await paymentModel.findByPayable(
+        PAYABLE_TYPE.MEMBERSHIP,
+        membership.id,
+        collegeId
+      );
+    }
 
     return {
+      ...membership,
       hasMembership: true,
       isActive: isCurrentlyActive,
+      status: isCurrentlyActive ? MEMBERSHIP_STATUS.ACTIVE : membership.status,
+      pendingPaymentId: pendingPayment ? pendingPayment.id : null,
       membership
     };
   },

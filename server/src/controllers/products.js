@@ -23,15 +23,20 @@ const productsController = {
   },
 
   addVariant: async (req, res) => {
-    const variant = await productsService.addVariant(req.params.id, req.collegeId, req.body);
+    const payload = {
+      ...req.body,
+      stock: req.body.stock !== undefined ? req.body.stock : req.body.stock_quantity
+    };
+    const variant = await productsService.addVariant(req.params.id, req.collegeId, payload);
     return sendSuccess(res, 201, 'Variant added successfully', variant);
   },
 
   updateVariantStock: async (req, res) => {
+    const stockVal = req.body.stock !== undefined ? req.body.stock : req.body.stock_quantity;
     const updated = await productsService.updateVariantStock(
       req.params.variantId,
       req.collegeId,
-      req.body.stock
+      stockVal
     );
     return sendSuccess(res, 200, 'Variant stock updated successfully', updated);
   },

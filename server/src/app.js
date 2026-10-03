@@ -1,5 +1,4 @@
 const express = require('express');
-const helmet = require('helmet');
 const cors = require('cors');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
@@ -10,9 +9,6 @@ const notFound = require('./middlewares/notFound');
 const env = require('./config/env');
 
 const app = express();
-
-// Security HTTP headers
-app.use(helmet());
 
 // CORS configuration
 app.use(cors());

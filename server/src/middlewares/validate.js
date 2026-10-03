@@ -19,7 +19,8 @@ const validate = (schema, source = 'body') => (req, _res, next) => {
       message: detail.message.replace(/['"]/g, '')
     }));
 
-    return next(new AppError('Validation failed', 400, errorDetails));
+    const detailSummary = errorDetails.map((d) => d.message).join('; ');
+    return next(new AppError(`Validation failed: ${detailSummary}`, 400, errorDetails));
   }
 
   req[source] = value;

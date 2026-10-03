@@ -40,6 +40,11 @@ const fundraisersController = {
       req.body.status
     );
     return sendSuccess(res, 200, 'Task status updated successfully', updated);
+  },
+
+  listAvailableStudents: async (req, res) => {
+    const students = await fundraisersService.listAvailableStudents(req.collegeId);
+    return sendSuccess(res, 200, 'Students retrieved successfully', students);
   }
 };
 

@@ -21,7 +21,7 @@ const productsService = {
       const createdV = await productModel.createVariant(collegeId, {
         product_id: product.id,
         size: v.size,
-        stock: parseInt(v.stock, 10) || 0
+        stock: parseInt(v.stock ?? v.stock_quantity, 10) || 0
       });
       createdVariants.push(createdV);
     }
