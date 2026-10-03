@@ -8,6 +8,17 @@ const listCollegeUsersSchema = Joi.object({
   search: Joi.string().trim().allow('')
 });
 
+const toggleUserStatusSchema = Joi.object({
+  isActive: Joi.boolean().required()
+});
+
+const approveAllUsersSchema = Joi.object({
+  role: Joi.string().valid(...ALL_ROLES).optional()
+});
+
 module.exports = {
-  listCollegeUsersSchema
+  listCollegeUsersSchema,
+  toggleUserStatusSchema,
+  approveAllUsersSchema
 };
+

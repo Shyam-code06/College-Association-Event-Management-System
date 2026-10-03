@@ -1,11 +1,27 @@
 const Joi = require('joi');
 const { EVENT_STATUS } = require('../constants/statuses');
 
+const validateFutureDate = (value, helpers) => {
+  if (!value) return value;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) {
+    return helpers.message('Invalid event date format');
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const eventDay = new Date(d);
+  eventDay.setHours(0, 0, 0, 0);
+  if (eventDay < today) {
+    return helpers.message('Event date cannot be in the past');
+  }
+  return value;
+};
+
 const createEventSchema = Joi.object({
   name: Joi.string().trim().min(2).max(150),
   title: Joi.string().trim().min(2).max(150),
   description: Joi.string().trim().allow(null, ''),
-  event_date: Joi.string().required(),
+  event_date: Joi.string().required().custom(validateFutureDate),
   start_time: Joi.string().allow(null, ''),
   location: Joi.string().trim().min(2).max(200),
   venue: Joi.string().trim().min(2).max(200),
@@ -21,7 +37,7 @@ const updateEventSchema = Joi.object({
   name: Joi.string().trim().min(2).max(150),
   title: Joi.string().trim().min(2).max(150),
   description: Joi.string().trim().allow(null, ''),
-  event_date: Joi.string(),
+  event_date: Joi.string().custom(validateFutureDate),
   start_time: Joi.string().allow(null, ''),
   location: Joi.string().trim().min(2).max(200),
   venue: Joi.string().trim().min(2).max(200),
@@ -32,6 +48,7 @@ const updateEventSchema = Joi.object({
   price: Joi.number().min(0).precision(2),
   status: Joi.string().valid(...Object.values(EVENT_STATUS))
 }).min(1).unknown(true);
+
 
 const listEventsSchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),

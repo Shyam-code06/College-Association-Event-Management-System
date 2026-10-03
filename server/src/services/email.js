@@ -41,10 +41,31 @@ const sendMail = async (options, maxRetries = 2) => {
  * @param {number} collegeId
  * @param {object} eventDetails
  */
-const sendEventNotificationAsync = async (collegeId, eventDetails) => {
-  // Fire and forget - runs completely in background
-  setImmediate(async () => {
+const sendEventNotificationAsync = async (collegeId, eventDetails, delayMs = 120000) => {
+  logger.info(
+    `[EmailService] Event "${eventDetails.name}" published for college ${collegeId}. Broadcast announcement emails queued to send in ${
+      delayMs / 1000
+    }s (2 minutes).`
+  );
+
+  // Immediately record scheduled status in email log for audit visibility
+  try {
+    await emailLogModel.create(collegeId, {
+      recipient: 'all-active-students@campus.edu',
+      subject: `[Queued 2-Min Broadcast] Event Announcement: ${eventDetails.name}`,
+      body: `Scheduled announcement for ${eventDetails.name} on ${eventDetails.event_date} at ${eventDetails.start_time}. Delivery scheduled in 2 minutes.`,
+      status: 'QUEUED'
+    });
+  } catch (err) {
+    // Non-blocking log
+  }
+
+  // Execute after 2 minutes (120,000 ms)
+  setTimeout(async () => {
     try {
+      logger.info(
+        `[EmailService] Executing 2-minute delayed broadcast for "${eventDetails.name}" (college ${collegeId})...`
+      );
       const students = await userModel.findActiveStudentsByCollege(collegeId);
       if (!students || students.length === 0) {
         return;
@@ -53,7 +74,7 @@ const sendEventNotificationAsync = async (collegeId, eventDetails) => {
       const subject = `New Event Announced: ${eventDetails.name}`;
       const htmlContent = `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-          <h2 style="color: #2563eb;">${eventDetails.name}</h2>
+          <h2 style="color: #6d28d9;">${eventDetails.name}</h2>
           <p>${eventDetails.description || 'You are invited to join our upcoming association event!'}</p>
           <table style="width: 100%; max-width: 500px; margin: 20px 0; border-collapse: collapse;">
             <tr><td style="padding: 8px; font-weight: bold;">Date:</td><td style="padding: 8px;">${eventDetails.event_date}</td></tr>
@@ -63,7 +84,7 @@ const sendEventNotificationAsync = async (collegeId, eventDetails) => {
             <tr><td style="padding: 8px; font-weight: bold;">Member Price:</td><td style="padding: 8px;">₹${parseFloat(eventDetails.member_price).toFixed(2)}</td></tr>
             <tr><td style="padding: 8px; font-weight: bold;">Non-Member Price:</td><td style="padding: 8px;">₹${parseFloat(eventDetails.non_member_price).toFixed(2)}</td></tr>
           </table>
-          <p>Login to your student portal to reserve your ticket now!</p>
+          <p>Login to your Odoo student portal to reserve your ticket or check volunteer opportunities!</p>
         </div>
       `;
 
@@ -94,10 +115,13 @@ const sendEventNotificationAsync = async (collegeId, eventDetails) => {
           await emailLogModel.createBatch(collegeId, logEntries);
         }
       }
+      logger.info(
+        `[EmailService] 2-minute delayed broadcast completed for "${eventDetails.name}". Dispatched to ${students.length} students.`
+      );
     } catch (err) {
       logger.error(`Error in sendEventNotificationAsync for college ${collegeId}: ${err.message}`);
     }
-  });
+  }, delayMs);
 };
 
 module.exports = {

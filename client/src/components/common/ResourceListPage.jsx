@@ -14,6 +14,7 @@ export const ResourceListPage = ({
   actionLabel,
   onAction,
   actionIcon,
+  actions,
   filterComponent,
   searchPlaceholder = 'Search records...',
   emptyTitle,
@@ -110,6 +111,7 @@ export const ResourceListPage = ({
         actionLabel={actionLabel}
         onAction={onAction}
         actionIcon={actionIcon}
+        actions={actions}
         searchComponent={
           <SearchInput
             value={searchTerm}

@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const membershipModel = require('../models/membership');
+const userModel = require('../models/user');
 const paymentModel = require('../models/payment');
 const { generateTransactionRef } = require('./mockPayment');
 const { MEMBERSHIP_STATUS, DUES_STATUS, PAYMENT_STATUS, PAYABLE_TYPE } = require('../constants/statuses');
@@ -152,6 +153,7 @@ const membershipsService = {
     const { page, limit, offset } = getPaginationParams(queryParams);
     const filters = {
       status: queryParams.status,
+      organization: queryParams.organization,
       search: queryParams.search,
       offset,
       limit
@@ -164,6 +166,56 @@ const membershipsService = {
       data: members,
       meta: buildPaginationMeta(total, page, limit)
     };
+  },
+
+  /**
+   * College Admin directly creates / grants a student membership for an organization.
+   */
+  adminCreateMembership: async (collegeId, { userId, planId, organization, status, duesStatus, durationMonths }) => {
+    const user = await userModel.findById(userId, collegeId);
+    if (!user) {
+      throw new AppError('Student user not found in this college', 404);
+    }
+
+    const plan = await membershipModel.findPlanById(planId, collegeId);
+    if (!plan) {
+      throw new AppError('Membership plan not found', 404);
+    }
+
+    const orgToUse = organization?.trim() || plan.organization || 'Odoo Student Association';
+    const months = durationMonths || plan.duration_months || 12;
+
+    const start = new Date();
+    const expiry = new Date();
+    expiry.setMonth(expiry.getMonth() + months);
+
+    const startDate = start.toISOString().split('T')[0];
+    const expiryDate = expiry.toISOString().split('T')[0];
+
+    const membership = await membershipModel.createMembership(collegeId, {
+      user_id: userId,
+      plan_id: planId,
+      organization: orgToUse,
+      status: status || MEMBERSHIP_STATUS.ACTIVE,
+      dues_status: duesStatus || DUES_STATUS.PAID,
+      start_date: startDate,
+      expiry_date: expiryDate
+    });
+
+    return membership;
+  },
+
+  /**
+   * College Admin deletes any student membership created by any organization.
+   */
+  deleteMembership: async (id, collegeId) => {
+    const membership = await membershipModel.findById(id, collegeId);
+    if (!membership) {
+      throw new AppError('Membership record not found', 404);
+    }
+
+    await membershipModel.deleteMembership(id, collegeId);
+    return { id, isDeleted: true };
   },
 
   /**

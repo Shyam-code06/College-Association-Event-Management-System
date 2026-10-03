@@ -24,6 +24,8 @@ const fundraisersService = {
     return fundraiserModel.createFundraiser(collegeId, {
       title: data.title,
       description: data.description || '',
+      organization: data.organization || 'Odoo Student Association',
+      event_id: data.event_id ? parseInt(data.event_id, 10) : null,
       goal_amount: parseFloat(goalAmount),
       start_date: startDate,
       end_date: endDate,
@@ -93,12 +95,17 @@ const fundraisersService = {
   },
 
   /**
-   * Creates a task assigned to a student of the same college.
+   * Creates a volunteer invitation/task assigned to an active association member.
+   * Ensures the student is an active member AND not already an attendee in the event.
    */
-  createTask: async (collegeId, fundraiserId, { title, description, assignee_id, due_date }) => {
+  createTask: async (
+    collegeId,
+    fundraiserId,
+    { title, description, assignee_id, due_date, invitation_deadline }
+  ) => {
     const fundraiser = await fundraiserModel.findFundraiserById(fundraiserId, collegeId);
     if (!fundraiser) {
-      throw new AppError('Fundraiser not found', 404);
+      throw new AppError('Volunteer project not found', 404);
     }
 
     const assignee = await userModel.findById(assignee_id, collegeId);
@@ -106,10 +113,29 @@ const fundraisersService = {
       throw new AppError('Assignee must be a student of the same college', 400);
     }
 
-    // Verify student is an active member of this organization
+    // 1. Verify student is an active member of the association
     const membership = await membershipModel.getActiveMembership(assignee_id, collegeId);
     if (!membership) {
-      throw new AppError(`Student ${assignee.name} is not an active member of this student association. Only association members can be assigned as volunteers.`, 400);
+      throw new AppError(
+        `Student ${assignee.name} is not an active member. Only active student association members can be invited as volunteers.`,
+        400
+      );
+    }
+
+    // 2. Verify student is NOT already participating in this event as an attendee
+    if (fundraiser.event_id) {
+      const registrationModel = require('../models/registration');
+      const attendeeReg = await registrationModel.findByEventAndUser(
+        fundraiser.event_id,
+        assignee_id,
+        collegeId
+      );
+      if (attendeeReg && attendeeReg.status !== 'cancelled') {
+        throw new AppError(
+          `Student ${assignee.name} is already registered as a participating attendee for this event and cannot be assigned as a volunteer.`,
+          400
+        );
+      }
     }
 
     let dueDate = due_date;
@@ -117,20 +143,33 @@ const fundraisersService = {
       dueDate = dueDate.split('T')[0];
     }
 
+    let invDeadline = invitation_deadline || dueDate || null;
+    if (invDeadline && invDeadline.includes('T')) {
+      invDeadline = invDeadline.split('T')[0];
+    }
+
     const createdTask = await fundraiserModel.createTask(collegeId, {
       fundraiser_id: fundraiserId,
       title,
       description: description || '',
       assignee_id,
-      due_date: dueDate || null
+      due_date: dueDate || null,
+      invitation_deadline: invDeadline,
+      invitation_status: 'pending'
     });
 
     // 1. Notify student via Email Log
     try {
       await emailLogModel.create(collegeId, {
         recipient: assignee.email,
-        subject: `New Volunteer Task Assigned: ${title}`,
-        body: `Hello ${assignee.name},\n\nYou have been assigned as a student volunteer for "${fundraiser.title}".\n\nTask Details:\n• Task: ${title}\n• Instructions: ${description || 'Follow instructions provided by your organizer.'}\n• Due Date: ${dueDate || 'Ongoing / ASAP'}\n\nPlease check your student dashboard under "My Tasks" to track progress.\n\nBest regards,\nSkyline Student Association`,
+        subject: `Volunteer Invitation: ${title} (${fundraiser.organization || 'Odoo Student Association'})`,
+        body: `Hello ${assignee.name},\n\nYou have been invited to volunteer for "${fundraiser.title}" by ${
+          fundraiser.organization || 'Odoo Student Association'
+        }.\n\nRole & Duties: ${title}\nInstructions: ${
+          description || 'Please follow instructions provided by your organizer.'
+        }\nInvitation Response Deadline: ${
+          invDeadline || 'Immediate'
+        }\n\nPlease sign in to your student dashboard to review and accept your volunteer invitation.\n\nBest regards,\nOdoo Student Association`,
         status: 'SENT'
       });
     } catch (err) {
@@ -140,8 +179,10 @@ const fundraisersService = {
     // 2. Broadcast Announcement for the student
     try {
       await announcementModel.create(collegeId, {
-        title: `Volunteer Task: ${title}`,
-        content: `Student volunteer ${assignee.name} has been assigned to task "${title}" for "${fundraiser.title}". Due date: ${dueDate || 'Ongoing'}.`,
+        title: `Volunteer Invitation: ${title}`,
+        content: `Active member ${assignee.name} has been invited as volunteer for "${fundraiser.title}". Response deadline: ${
+          invDeadline || 'Open'
+        }.`,
         target_audience: 'STUDENTS',
         created_by: fundraiser.created_by
       });
@@ -153,10 +194,28 @@ const fundraisersService = {
   },
 
   /**
-   * Retrieves list of registered students who are active members of this organization.
+   * Retrieves list of registered students who are active members of this organization
+   * and optionally filters out students already registered as attendees for an event.
    */
-  listAvailableStudents: async (collegeId) => {
-    return membershipModel.findActiveMembersByCollege(collegeId);
+  listAvailableStudents: async (collegeId, eventId = null) => {
+    let students = await membershipModel.findActiveMembersByCollege(collegeId);
+    if (eventId) {
+      const registeredUserIds = await db('registrations')
+        .where('event_id', eventId)
+        .where('college_id', collegeId)
+        .whereNot('status', 'cancelled')
+        .pluck('user_id');
+
+      students = students.filter((s) => !registeredUserIds.includes(s.id));
+    }
+    return students;
+  },
+
+  /**
+   * Allows student to accept or decline a volunteer invitation before deadline.
+   */
+  respondToInvitation: async (taskId, studentId, collegeId, action) => {
+    return fundraiserModel.respondToInvitation(taskId, studentId, collegeId, action);
   },
 
   /**

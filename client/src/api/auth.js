@@ -5,6 +5,10 @@ export const authApi = {
   register: (data) => apiClient.post('/auth/register', data),
   me: () => apiClient.get('/auth/me'),
   changePassword: (data) => apiClient.post('/auth/change-password', data),
+  requestApproval: (email) => apiClient.post('/auth/request-approval', { email }),
+  checkCampus: (email) => apiClient.post('/auth/check-campus', { email }),
 };
 
 export default authApi;
+
+

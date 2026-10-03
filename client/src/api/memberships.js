@@ -7,6 +7,8 @@ export const membershipsApi = {
   join: (data) => apiClient.post('/memberships/join', data),
   getMyMembership: () => apiClient.get('/memberships/me'),
   listMembers: (params) => apiClient.get('/memberships', { params }),
+  adminCreate: (data) => apiClient.post('/memberships/admin-create', data),
+  deleteMember: (id) => apiClient.delete(`/memberships/${id}`),
   verifyMembership: (id) => apiClient.get(`/memberships/${id}/verify`),
 };
 

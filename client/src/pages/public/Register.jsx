@@ -1,15 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { CheckCircle2, AlertCircle, Building2, School } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Building2 } from 'lucide-react';
+
 import { Wizard } from '@/components/ui/Wizard';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
 import { createWizardStore } from '@/stores/wizard';
 import { useAuthStore } from '@/stores/auth';
 import { authApi } from '@/api/auth';
-import { collegesApi } from '@/api/colleges';
+
 
 // Step 1: Account schema
 const accountSchema = z
@@ -33,57 +34,42 @@ const collegeSchema = z.object({
 
 // Step 1 Component: Account & Auto-Campus Identification
 const AccountStep = ({ formData, updateFormData, errors }) => {
-  const [colleges, setColleges] = useState([]);
-  const [loadingColleges, setLoadingColleges] = useState(true);
-
-  useEffect(() => {
-    collegesApi
-      .getPublic()
-      .then((res) => {
-        const list = res.data || [];
-        setColleges(list);
-      })
-      .catch((err) => console.error('Failed to load colleges', err))
-      .finally(() => setLoadingColleges(false));
-  }, []);
-
   const email = formData.email ? formData.email.trim() : '';
   const emailDomain = email.includes('@') ? email.split('@')[1]?.toLowerCase().trim() : '';
+  const matchedCollege = formData.college_name
+    ? { name: formData.college_name, domain: formData.college_domain }
+    : null;
 
-  const matchedCollege = colleges.find(
-    (c) =>
-      c.domain &&
-      emailDomain &&
-      (emailDomain === c.domain.toLowerCase() || emailDomain.endsWith('.' + c.domain.toLowerCase()))
-  );
-
-  const handleEmailChange = (val) => {
+  const handleEmailChange = async (val) => {
     const inputVal = val.trim();
     const domainPart = inputVal.includes('@') ? inputVal.split('@')[1]?.toLowerCase().trim() : '';
 
-    const matched = colleges.find(
-      (c) =>
-        c.domain &&
-        domainPart &&
-        (domainPart === c.domain.toLowerCase() || domainPart.endsWith('.' + c.domain.toLowerCase()))
-    );
-
-    if (matched) {
-      updateFormData({
-        email: inputVal,
-        college_id: String(matched.id),
-        college_name: matched.name,
-        college_domain: matched.domain,
-      });
-    } else {
-      updateFormData({
-        email: inputVal,
-        college_id: '',
-        college_name: '',
-        college_domain: '',
-      });
+    if (domainPart && domainPart.includes('.')) {
+      try {
+        const res = await authApi.checkCampus(inputVal);
+        const data = res.data || res;
+        if (data.matched && data.college) {
+          updateFormData({
+            email: inputVal,
+            college_id: String(data.college.id),
+            college_name: data.college.name,
+            college_domain: data.college.domain,
+          });
+          return;
+        }
+      } catch (err) {
+        // Fallback
+      }
     }
+
+    updateFormData({
+      email: inputVal,
+      college_id: '',
+      college_name: '',
+      college_domain: '',
+    });
   };
+
 
   return (
     <div className="space-y-4 text-left">
@@ -251,9 +237,9 @@ const DoneStep = () => {
       <div className="h-16 w-16 rounded-pill bg-success/10 text-success flex items-center justify-center mx-auto mb-4">
         <CheckCircle2 className="h-10 w-10" />
       </div>
-      <h3 className="text-xl font-bold text-ink mb-1">Registration Complete!</h3>
+      <h3 className="text-xl font-bold text-ink mb-1">Registration Submitted!</h3>
       <p className="text-sm text-muted max-w-sm mx-auto">
-        Your student association account is activated and you are logged in. Click below to enter your student portal.
+        Your student association account has been created and submitted to your College Administrator for approval. Once approved, you can sign in to access your dashboard.
       </p>
     </div>
   );
@@ -302,7 +288,7 @@ export const Register = () => {
     },
     {
       id: 'done',
-      title: 'Welcome to Skyline',
+      title: 'Registration Submitted',
       subtitle: '',
       component: DoneStep,
     },
@@ -324,7 +310,7 @@ export const Register = () => {
         setAuth(token, user);
         toast.success(`Welcome, ${user.name}! Your account is active.`);
       } else {
-        toast.success('Account created successfully!');
+        toast.success('Registration submitted! Awaiting College Admin approval.');
       }
     } catch (err) {
       toast.error(err?.message || 'Registration failed.');
@@ -338,10 +324,11 @@ export const Register = () => {
         steps={steps}
         store={registerStore}
         onSubmit={handleSubmit}
-        onDone={() => navigate('/apps', { replace: true })}
+        onDone={() => navigate('/login', { replace: true })}
         confirmButtonText="Confirm Registration"
-        doneButtonText="Enter Student Portal"
+        doneButtonText="Proceed to Sign In"
       />
+
       <p className="text-center text-xs text-muted mt-4">
         Already registered?{' '}
         <Link to="/login" className="font-semibold text-primary hover:underline">

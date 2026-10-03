@@ -39,31 +39,57 @@ const BasicsStep = ({ formData, updateFormData, errors }) => (
   </div>
 );
 
+// Helper for min datetime-local string (current date & time)
+const getMinDateTime = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
 // Step 2: Date & Place
 const scheduleSchema = z.object({
-  event_date: z.string().min(1, 'Please select the event date and time'),
+  event_date: z
+    .string()
+    .min(1, 'Please select the event date and time')
+    .refine(
+      (val) => {
+        const selected = new Date(val);
+        return !isNaN(selected.getTime()) && selected >= new Date();
+      },
+      { message: 'Event date cannot be in the past. Please choose a future date & time.' }
+    ),
   venue: z.string().min(2, 'Venue is required'),
 });
 
-const ScheduleStep = ({ formData, updateFormData, errors }) => (
-  <div className="space-y-4">
-    <FormField label="Date & Time" required error={errors.event_date}>
-      <Input
-        type="datetime-local"
-        value={formData.event_date || ''}
-        onChange={(e) => updateFormData({ event_date: e.target.value })}
-      />
-    </FormField>
+const ScheduleStep = ({ formData, updateFormData, errors }) => {
+  const minDateTime = useMemo(() => getMinDateTime(), []);
 
-    <FormField label="Campus Venue / Auditorium" required error={errors.venue}>
-      <Input
-        placeholder="e.g. Main Auditorium, Block 3"
-        value={formData.venue || ''}
-        onChange={(e) => updateFormData({ venue: e.target.value })}
-      />
-    </FormField>
-  </div>
-);
+  return (
+    <div className="space-y-4">
+      <FormField label="Date & Time" required error={errors.event_date}>
+        <Input
+          type="datetime-local"
+          min={minDateTime}
+          value={formData.event_date || ''}
+          onChange={(e) => updateFormData({ event_date: e.target.value })}
+        />
+      </FormField>
+
+      <FormField label="Campus Venue / Auditorium" required error={errors.venue}>
+        <Input
+          placeholder="e.g. Main Auditorium, Block 3"
+          value={formData.venue || ''}
+          onChange={(e) => updateFormData({ venue: e.target.value })}
+        />
+      </FormField>
+    </div>
+  );
+};
+
 
 // Step 3: Capacity & Pricing
 const capacityPricingSchema = z.object({
@@ -231,7 +257,10 @@ export const EventCreate = () => {
         member_price: memberPrice,
         status: 'published',
       });
-      toast.success('Event published successfully!');
+      toast.success(
+        'Event published successfully! Announcement and invitation emails have been queued and will be sent automatically in 2 minutes to all association members.',
+        { duration: 6000 }
+      );
     } catch (err) {
       const msg = err?.message || err?.raw?.message || 'Failed to publish event.';
       toast.error(msg);

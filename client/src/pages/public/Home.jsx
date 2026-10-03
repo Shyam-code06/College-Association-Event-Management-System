@@ -1,5 +1,5 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Calendar,
   Ticket,
@@ -15,6 +15,19 @@ import { Highlight } from '@/components/ui/Highlight';
 
 export const Home = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.hash) {
+      const id = location.hash.replace('#', '');
+      const el = document.getElementById(id);
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
+    }
+  }, [location]);
 
   return (
     <div className="w-full flex flex-col">
@@ -77,7 +90,7 @@ export const Home = () => {
       </section>
 
       {/* Feature Highlights Grid */}
-      <section id="features" className="py-20 bg-canvas">
+      <section id="features" className="scroll-mt-20 py-20 bg-canvas">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-2xl sm:text-3xl font-bold text-ink">
@@ -89,7 +102,7 @@ export const Home = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <Card className="p-6 bg-surface hover:shadow-card transition-all duration-200">
               <div className="h-12 w-12 rounded-lg bg-primary-soft text-primary flex items-center justify-center mb-5">
                 <Ticket className="h-6 w-6" />
@@ -106,7 +119,27 @@ export const Home = () => {
               </div>
               <h3 className="text-base font-bold text-ink mb-2">Tiered Memberships</h3>
               <p className="text-xs text-muted leading-relaxed">
-                Provide student association passes with automatic member-exclusive discounts on events & merch.
+                Multi-club passes for Odoo Association, CSI, IEEE, and ACM with automatic member-exclusive discounts.
+              </p>
+            </Card>
+
+            <Card className="p-6 bg-surface hover:shadow-card transition-all duration-200">
+              <div className="h-12 w-12 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center mb-5">
+                <Calendar className="h-6 w-6" />
+              </div>
+              <h3 className="text-base font-bold text-ink mb-2">Volunteer Invitations & Deadlines</h3>
+              <p className="text-xs text-muted leading-relaxed">
+                Invite active association members as volunteers with response deadlines. Strictly separates event attendees from event volunteers.
+              </p>
+            </Card>
+
+            <Card className="p-6 bg-surface hover:shadow-card transition-all duration-200">
+              <div className="h-12 w-12 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center mb-5">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+              <h3 className="text-base font-bold text-ink mb-2">Automated 2-Min Broadcasts</h3>
+              <p className="text-xs text-muted leading-relaxed">
+                When organizers publish events, invitation emails are queued and automatically dispatched after 2 minutes to all campus members.
               </p>
             </Card>
 
@@ -133,8 +166,8 @@ export const Home = () => {
         </div>
       </section>
 
-      {/* Stats Counter */}
-      <section className="py-16 bg-surface border-y border-line">
+      {/* Stats Counter / About Section */}
+      <section id="about" className="scroll-mt-20 py-16 bg-surface border-y border-line">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div>

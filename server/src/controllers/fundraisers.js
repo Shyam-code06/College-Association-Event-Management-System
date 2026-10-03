@@ -43,8 +43,23 @@ const fundraisersController = {
   },
 
   listAvailableStudents: async (req, res) => {
-    const students = await fundraisersService.listAvailableStudents(req.collegeId);
+    const students = await fundraisersService.listAvailableStudents(req.collegeId, req.query.eventId);
     return sendSuccess(res, 200, 'Students retrieved successfully', students);
+  },
+
+  respondToInvitation: async (req, res) => {
+    const result = await fundraisersService.respondToInvitation(
+      req.params.taskId,
+      req.user.id,
+      req.collegeId,
+      req.body.action
+    );
+    return sendSuccess(
+      res,
+      200,
+      `Volunteer invitation ${req.body.action}ed successfully`,
+      result
+    );
   }
 };
 

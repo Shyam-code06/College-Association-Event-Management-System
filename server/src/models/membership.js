@@ -87,19 +87,34 @@ const membershipModel = {
     return query.first();
   },
 
-  findAllMembers: async (collegeId, { status, search, offset = 0, limit = 10 }, trx = db) => {
+  deleteMembership: async (id, collegeId, trx = db) => {
+    // Clean up any related payments first
+    await trx('payments')
+      .where({ payable_type: 'membership', payable_id: id })
+      .del();
+
+    let query = trx('memberships').where('id', id);
+    query = applyTenantScope(query, collegeId);
+    return query.del();
+  },
+
+  findAllMembers: async (collegeId, { status, search, organization, offset = 0, limit = 10 }, trx = db) => {
     let query = trx('memberships')
       .select(
         'memberships.id',
         'memberships.college_id',
         'memberships.user_id',
+        'memberships.plan_id',
+        'memberships.organization',
         'memberships.status',
         'memberships.dues_status',
         'memberships.start_date',
         'memberships.expiry_date',
         'memberships.created_at',
         'users.name as user_name',
+        'users.name as student_name',
         'users.email as user_email',
+        'users.email as student_email',
         'membership_plans.name as plan_name'
       )
       .join('users', 'memberships.user_id', 'users.id')
@@ -111,18 +126,26 @@ const membershipModel = {
       query = query.where('memberships.status', status);
     }
 
+    if (organization) {
+      query = query.where('memberships.organization', organization);
+    }
+
     if (search) {
       query = query.where((q) => {
-        q.where('users.name', 'like', `%${search}%`).orWhere('users.email', 'like', `%${search}%`);
+        q.where('users.name', 'like', `%${search}%`)
+          .orWhere('users.email', 'like', `%${search}%`)
+          .orWhere('memberships.organization', 'like', `%${search}%`)
+          .orWhere('membership_plans.name', 'like', `%${search}%`);
       });
     }
 
     return query.orderBy('memberships.created_at', 'desc').offset(offset).limit(limit);
   },
 
-  countMembers: async (collegeId, { status, search }, trx = db) => {
+  countMembers: async (collegeId, { status, search, organization }, trx = db) => {
     let query = trx('memberships')
-      .join('users', 'memberships.user_id', 'users.id');
+      .join('users', 'memberships.user_id', 'users.id')
+      .join('membership_plans', 'memberships.plan_id', 'membership_plans.id');
 
     query = applyTenantScope(query, collegeId, 'memberships');
 
@@ -130,9 +153,16 @@ const membershipModel = {
       query = query.where('memberships.status', status);
     }
 
+    if (organization) {
+      query = query.where('memberships.organization', organization);
+    }
+
     if (search) {
       query = query.where((q) => {
-        q.where('users.name', 'like', `%${search}%`).orWhere('users.email', 'like', `%${search}%`);
+        q.where('users.name', 'like', `%${search}%`)
+          .orWhere('users.email', 'like', `%${search}%`)
+          .orWhere('memberships.organization', 'like', `%${search}%`)
+          .orWhere('membership_plans.name', 'like', `%${search}%`);
       });
     }
 

@@ -44,6 +44,7 @@ const EventReport = lazy(() => import('@/pages/organizer/EventReport'));
 // College Admin Pages
 const CollegeOverview = lazy(() => import('@/pages/college_admin/Overview'));
 const Organizers = lazy(() => import('@/pages/college_admin/Organizers'));
+const AdminStudents = lazy(() => import('@/pages/college_admin/Students'));
 const Members = lazy(() => import('@/pages/college_admin/Members'));
 const Plans = lazy(() => import('@/pages/college_admin/Plans'));
 const AdminEvents = lazy(() => import('@/pages/college_admin/Events'));
@@ -277,6 +278,16 @@ export const router = createBrowserRouter([
           <ProtectedRoute allowedRoles={[ROLES.COLLEGE_ADMIN]}>
             <Suspense fallback={<PageLoader />}>
               <Organizers />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/admin/students',
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.COLLEGE_ADMIN]}>
+            <Suspense fallback={<PageLoader />}>
+              <AdminStudents />
             </Suspense>
           </ProtectedRoute>
         ),

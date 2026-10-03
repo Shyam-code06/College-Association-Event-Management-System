@@ -35,6 +35,16 @@ const membershipsController = {
   verifyStatus: async (req, res) => {
     const result = await membershipsService.verifyMemberStatus(req.collegeId, req.query.identifier);
     return sendSuccess(res, 200, 'Member verification completed', result);
+  },
+
+  adminCreateMembership: async (req, res) => {
+    const result = await membershipsService.adminCreateMembership(req.collegeId, req.body);
+    return sendSuccess(res, 201, 'Student membership created successfully', result);
+  },
+
+  deleteMembership: async (req, res) => {
+    const result = await membershipsService.deleteMembership(req.params.id, req.collegeId);
+    return sendSuccess(res, 200, 'Student membership deleted successfully', result);
   }
 };
 

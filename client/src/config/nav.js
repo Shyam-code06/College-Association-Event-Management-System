@@ -18,7 +18,9 @@ import {
   Shield,
   PlusCircle,
   CheckSquare,
+  GraduationCap,
 } from 'lucide-react';
+
 import { ROLES } from '@/utils/constants';
 
 export const APP_NAVIGATION = {
@@ -48,12 +50,20 @@ export const APP_NAVIGATION = {
       icon: Users,
     },
     {
+      id: 'students',
+      title: 'Students',
+      description: 'All registered students, account status, and approval controls',
+      path: '/admin/students',
+      icon: GraduationCap,
+    },
+    {
       id: 'members',
       title: 'Memberships',
       description: 'Active student memberships and renewals',
       path: '/admin/members',
       icon: UserCheck,
     },
+
     {
       id: 'plans',
       title: 'Member Plans',

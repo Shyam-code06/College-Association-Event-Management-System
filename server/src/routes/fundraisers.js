@@ -10,6 +10,7 @@ const {
   createFundraiserSchema,
   updateFundraiserSchema,
   createTaskSchema,
+  respondInvitationSchema,
   updateTaskStatusSchema,
   listFundraisersSchema
 } = require('../validations/fundraisers');
@@ -18,11 +19,19 @@ const router = express.Router();
 
 router.use(auth, tenant);
 
-// Student: personal assigned tasks
+// Student: personal assigned tasks & volunteer invitations
 router.get(
   '/tasks/me',
   authorize(ROLES.STUDENT),
   asyncHandler(fundraisersController.getStudentTasks)
+);
+
+// Student: respond to volunteer invitation (accept or decline before deadline)
+router.patch(
+  '/tasks/:taskId/invitation',
+  authorize(ROLES.STUDENT),
+  validate(respondInvitationSchema),
+  asyncHandler(fundraisersController.respondToInvitation)
 );
 
 // Student, Organizer or Admin: update task status

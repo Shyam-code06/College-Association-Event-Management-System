@@ -195,6 +195,21 @@ const userModel = {
       selectQuery = applyTenantScope(selectQuery, collegeId);
     }
     return selectQuery.first();
+  },
+
+  approveAllPending: async (collegeId, role = null, trx = db) => {
+    let query = trx('users')
+      .whereNull('deleted_at')
+      .where('is_active', false);
+
+    query = applyTenantScope(query, collegeId, 'users');
+
+    if (role) {
+      query = query.where('role', role);
+    }
+
+    const updated = await query.update({ is_active: true });
+    return updated;
   }
 };
 

@@ -32,8 +32,16 @@ const registrationsService = {
       }
 
       if (event.status !== EVENT_STATUS.PUBLISHED) {
-        throw new AppError(`Event is not open for registration (status: ${event.status})`, 400);
+        throw new AppError(`Event is closed for registration (status: ${event.status})`, 400);
       }
+
+      const eventDate = new Date(event.event_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (eventDate < today) {
+        throw new AppError('This event has already ended and registration is closed', 400);
+      }
+
 
       // 2. Check for duplicate registration
       const existingRegistration = await registrationModel.findByEventAndUser(
@@ -44,6 +52,21 @@ const registrationsService = {
       );
       if (existingRegistration && existingRegistration.status !== REGISTRATION_STATUS.CANCELLED) {
         throw new AppError('You are already registered for this event', 409);
+      }
+
+      // 3. Check if student is assigned as a volunteer for this event
+      const volunteerMatch = await trx('fundraiser_tasks')
+        .join('fundraisers', 'fundraiser_tasks.fundraiser_id', 'fundraisers.id')
+        .where('fundraiser_tasks.assignee_id', userId)
+        .where('fundraisers.event_id', eventId)
+        .whereIn('fundraiser_tasks.invitation_status', ['pending', 'accepted'])
+        .first();
+
+      if (volunteerMatch) {
+        throw new AppError(
+          'You are assigned as a volunteer for this event and cannot register as a participating attendee.',
+          400
+        );
       }
 
       // 3. Check capacity against active registrations (reserved or confirmed)

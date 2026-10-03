@@ -17,6 +17,7 @@ export const Plans = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
   const [name, setName] = useState('');
+  const [organization, setOrganization] = useState('Odoo Student Association');
   const [fee, setFee] = useState('');
   const [durationMonths, setDurationMonths] = useState('12');
   const [merchDiscountPercent, setMerchDiscountPercent] = useState('10');
@@ -38,6 +39,7 @@ export const Plans = () => {
   const openCreate = () => {
     setEditingPlan(null);
     setName('');
+    setOrganization('Odoo Student Association');
     setFee('');
     setDurationMonths('12');
     setMerchDiscountPercent('10');
@@ -47,6 +49,7 @@ export const Plans = () => {
   const openEdit = (plan) => {
     setEditingPlan(plan);
     setName(plan.name);
+    setOrganization(plan.organization || 'Odoo Student Association');
     setFee(String(plan.fee));
     setDurationMonths(String(plan.duration_months || 12));
     setMerchDiscountPercent(String(plan.merch_discount_percent || 10));
@@ -59,6 +62,7 @@ export const Plans = () => {
     try {
       const payload = {
         name,
+        organization: organization || 'Odoo Student Association',
         fee: Number(fee),
         duration_months: Number(durationMonths),
         merch_discount_percent: Number(merchDiscountPercent),
@@ -107,14 +111,19 @@ export const Plans = () => {
                   <div className="h-10 w-10 rounded-md bg-primary-soft text-primary flex items-center justify-center">
                     <Award className="h-5 w-5" />
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openEdit(plan)}
-                    icon={Edit2}
-                  >
-                    Edit
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-sm bg-primary/10 text-primary border border-primary/20">
+                      {plan.organization || 'Odoo Student Association'}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openEdit(plan)}
+                      icon={Edit2}
+                    >
+                      Edit
+                    </Button>
+                  </div>
                 </div>
 
                 <h3 className="font-bold text-lg text-ink">{plan.name}</h3>
@@ -154,6 +163,15 @@ export const Plans = () => {
               placeholder="e.g. Gold Association Member"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </FormField>
+
+          <FormField label="Student Organization" required hint="e.g. Odoo Student Association, CSI, IEEE, ACM">
+            <Input
+              placeholder="e.g. Odoo Student Association"
+              value={organization}
+              onChange={(e) => setOrganization(e.target.value)}
               required
             />
           </FormField>

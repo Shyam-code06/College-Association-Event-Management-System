@@ -52,7 +52,7 @@ export const Topbar = () => {
           <Link to="/apps" className="flex items-center gap-2 text-surface hover:opacity-90 transition-opacity">
             <Sparkles className="h-4 w-4" />
             <span className="font-bold tracking-tight text-sm hidden sm:inline">
-              Skyline
+              Odoo Student Organization
             </span>
           </Link>
 

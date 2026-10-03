@@ -6,7 +6,7 @@ const tenant = require('../middlewares/tenant');
 const validate = require('../middlewares/validate');
 const asyncHandler = require('../utils/asyncHandler');
 const { ROLES } = require('../constants/roles');
-const { listCollegeUsersSchema } = require('../validations/users');
+const { listCollegeUsersSchema, toggleUserStatusSchema, approveAllUsersSchema } = require('../validations/users');
 
 const router = express.Router();
 
@@ -18,4 +18,22 @@ router.get(
   asyncHandler(usersController.listCollegeUsers)
 );
 
+router.post(
+  '/approve-all',
+  validate(approveAllUsersSchema),
+  asyncHandler(usersController.approveAllUsers)
+);
+
+router.patch(
+  '/:id/status',
+  validate(toggleUserStatusSchema),
+  asyncHandler(usersController.toggleUserStatus)
+);
+
+router.delete(
+  '/:id',
+  asyncHandler(usersController.deleteUser)
+);
+
 module.exports = router;
+

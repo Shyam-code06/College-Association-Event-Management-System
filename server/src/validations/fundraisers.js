@@ -28,8 +28,14 @@ const createTaskSchema = Joi.object({
   title: Joi.string().trim().min(2).max(150).required(),
   description: Joi.string().trim().allow(null, ''),
   assignee_id: Joi.number().integer().positive().required(),
-  due_date: Joi.string().allow(null, '')
+  due_date: Joi.string().allow(null, ''),
+  invitation_deadline: Joi.string().allow(null, ''),
+  organization: Joi.string().trim().allow(null, '')
 }).unknown(true);
+
+const respondInvitationSchema = Joi.object({
+  action: Joi.string().valid('accept', 'decline').required()
+});
 
 const updateTaskStatusSchema = Joi.object({
   status: Joi.string()
@@ -53,6 +59,7 @@ module.exports = {
   createFundraiserSchema,
   updateFundraiserSchema,
   createTaskSchema,
+  respondInvitationSchema,
   updateTaskStatusSchema,
   listFundraisersSchema
 };

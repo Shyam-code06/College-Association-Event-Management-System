@@ -4,14 +4,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { Sparkles, ArrowRight, KeyRound } from 'lucide-react';
+import { Sparkles, ArrowRight, Clock, Send } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
 import { useAuthStore } from '@/stores/auth';
 import { authApi } from '@/api/auth';
-import { DEMO_CREDENTIALS } from '@/utils/constants';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -23,6 +22,8 @@ export const Login = () => {
   const location = useLocation();
   const setAuth = useAuthStore((state) => state.setAuth);
   const [isLoading, setIsLoading] = useState(false);
+  const [approvalNotice, setApprovalNotice] = useState(null);
+  const [isRequestingApproval, setIsRequestingApproval] = useState(false);
 
   const {
     register,
@@ -39,6 +40,7 @@ export const Login = () => {
 
   const onSubmit = async (data) => {
     setIsLoading(true);
+    setApprovalNotice(null);
     try {
       const res = await authApi.login(data);
       const { token, user } = res.data;
@@ -48,50 +50,84 @@ export const Login = () => {
       const destination = location.state?.from?.pathname || '/apps';
       navigate(destination, { replace: true });
     } catch (err) {
-      toast.error(err?.message || 'Login failed. Please check your credentials.');
+      const msg = err?.message || 'Login failed. Please check your credentials.';
+      if (
+        msg.toLowerCase().includes('approval') ||
+        msg.toLowerCase().includes('deactivated') ||
+        msg.toLowerCase().includes('pending')
+      ) {
+        setApprovalNotice({
+          email: data.email,
+          message: msg,
+        });
+      }
+      toast.error(msg);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fillDemo = (cred) => {
-    setValue('email', cred.email, { shouldValidate: true });
-    setValue('password', cred.password, { shouldValidate: true });
+  const handleSendApprovalRequest = async () => {
+    if (!approvalNotice?.email) return;
+    setIsRequestingApproval(true);
+    try {
+      const res = await authApi.requestApproval(approvalNotice.email);
+      toast.success(res?.message || 'Approval request sent to College Administrator!');
+    } catch (err) {
+      toast.error(err?.message || 'Failed to submit approval request.');
+    } finally {
+      setIsRequestingApproval(false);
+    }
   };
 
   return (
-    <div className="min-h-[85vh] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center mb-6">
-        <Link to="/" className="inline-flex items-center gap-2 mb-3">
-          <div className="h-10 w-10 rounded-md bg-primary flex items-center justify-center text-surface shadow-xs">
-            <Sparkles className="h-5 w-5" />
+    <div className="min-h-[90vh] flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 bg-canvas/40">
+      <div className="w-full max-w-[420px]">
+        {/* Vertical Login Card Container */}
+        <Card className="p-8 sm:p-10 bg-surface shadow-card border border-line rounded-2xl flex flex-col">
+          {/* Vertical Header & Logo */}
+          <div className="text-center mb-8">
+            <Link to="/" className="inline-flex flex-col items-center gap-2 group mb-3">
+              <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center text-surface shadow-xs transition-transform group-hover:scale-105">
+                <Sparkles className="h-6 w-6" />
+              </div>
+              <span className="text-xl font-bold tracking-tight text-ink">Skyline</span>
+            </Link>
+            <h2 className="text-2xl font-extrabold tracking-tight text-ink mt-1">
+              Sign in to your account
+            </h2>
+            <p className="text-xs text-muted mt-1.5 leading-relaxed">
+              Access your student association apps and dashboard
+            </p>
           </div>
-          <span className="text-xl font-bold tracking-tight text-ink">Skyline</span>
-        </Link>
-        <h2 className="text-2xl font-bold tracking-tight text-ink">
-          Sign in to your account
-        </h2>
-        <p className="text-xs text-muted mt-1">
-          Access your student association apps and dashboard
-        </p>
-      </div>
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
-        <Card className="p-8 bg-surface shadow-card border border-line rounded-lg">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <FormField label="Email address" required error={errors.email?.message}>
+          {/* Form Fields Stacked Vertically */}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <FormField
+              label="EMAIL ADDRESS"
+              required
+              error={errors.email?.message}
+              labelClassName="text-[11px] font-bold uppercase tracking-wider text-ink"
+            >
               <Input
                 type="email"
                 placeholder="name@skyline.edu"
+                className="h-11 px-3.5 text-sm rounded-lg border-line focus:ring-2 focus:ring-primary/20"
                 {...register('email')}
                 disabled={isLoading}
               />
             </FormField>
 
-            <FormField label="Password" required error={errors.password?.message}>
+            <FormField
+              label="PASSWORD"
+              required
+              error={errors.password?.message}
+              labelClassName="text-[11px] font-bold uppercase tracking-wider text-ink"
+            >
               <Input
                 type="password"
                 placeholder="••••••••"
+                className="h-11 px-3.5 text-sm rounded-lg border-line focus:ring-2 focus:ring-primary/20"
                 {...register('password')}
                 disabled={isLoading}
               />
@@ -101,7 +137,7 @@ export const Login = () => {
               type="submit"
               variant="primary"
               size="lg"
-              className="w-full justify-center mt-2"
+              className="w-full h-11 text-sm font-semibold justify-center mt-3 rounded-lg shadow-sm"
               isLoading={isLoading}
               icon={ArrowRight}
             >
@@ -109,58 +145,47 @@ export const Login = () => {
             </Button>
           </form>
 
-          {/* Demo Credential Chips */}
-          <div className="mt-8 pt-6 border-t border-line">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-muted mb-3">
-              <KeyRound className="h-3.5 w-3.5 text-primary" />
-              <span>Demo Quick-Fill Credentials:</span>
+          {/* Approval Notice Banner */}
+          {approvalNotice && (
+            <div className="mt-5 p-3.5 rounded-xl bg-warning/10 border border-warning/30 text-ink space-y-2.5">
+              <div className="flex items-start gap-2">
+                <Clock className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <h4 className="font-bold text-ink">Approval Required</h4>
+                  <p className="text-muted mt-0.5 leading-relaxed text-[11px]">
+                    {approvalNotice.message}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-1 border-t border-warning/20">
+                <span className="text-[10px] text-muted truncate max-w-[150px]">
+                  {approvalNotice.email}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  isLoading={isRequestingApproval}
+                  onClick={handleSendApprovalRequest}
+                  icon={Send}
+                  className="text-[11px] h-7 px-2.5 border-warning/40 hover:bg-warning/10 text-ink"
+                >
+                  Request Approval
+                </Button>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => fillDemo(DEMO_CREDENTIALS.SUPER_ADMIN)}
-                className="text-left p-2 rounded-md border border-line bg-canvas hover:bg-canvas-2 transition-colors text-xs"
-              >
-                <div className="font-semibold text-ink">Super Admin</div>
-                <div className="text-[10px] text-muted truncate">superadmin@skyline.edu</div>
-              </button>
+          )}
 
-              <button
-                type="button"
-                onClick={() => fillDemo(DEMO_CREDENTIALS.COLLEGE_ADMIN)}
-                className="text-left p-2 rounded-md border border-line bg-canvas hover:bg-canvas-2 transition-colors text-xs"
-              >
-                <div className="font-semibold text-ink">College Admin</div>
-                <div className="text-[10px] text-muted truncate">collegeadmin@skyline.edu</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fillDemo(DEMO_CREDENTIALS.ORGANIZER)}
-                className="text-left p-2 rounded-md border border-line bg-canvas hover:bg-canvas-2 transition-colors text-xs"
-              >
-                <div className="font-semibold text-ink">Organizer</div>
-                <div className="text-[10px] text-muted truncate">organizer@skyline.edu</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fillDemo(DEMO_CREDENTIALS.STUDENT)}
-                className="text-left p-2 rounded-md border border-line bg-canvas hover:bg-canvas-2 transition-colors text-xs"
-              >
-                <div className="font-semibold text-ink">Student</div>
-                <div className="text-[10px] text-muted truncate">aarav@skyline.edu</div>
-              </button>
-            </div>
+          {/* Vertical Card Footer */}
+          <div className="mt-8 pt-5 border-t border-line text-center">
+            <p className="text-xs text-muted">
+              Don&apos;t have an account?{' '}
+              <Link to="/register" className="font-semibold text-primary hover:underline">
+                Register here
+              </Link>
+            </p>
           </div>
         </Card>
-
-        <p className="text-center text-xs text-muted mt-6">
-          Don&apos;t have an account?{' '}
-          <Link to="/register" className="font-semibold text-primary hover:underline">
-            Register here
-          </Link>
-        </p>
       </div>
     </div>
   );

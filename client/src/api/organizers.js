@@ -5,7 +5,7 @@ const base = createResourceApi('/organizers');
 
 export const organizersApi = {
   ...base,
-  toggleAccess: (id) => apiClient.patch(`/organizers/${id}/access`),
+  toggleAccess: (id, isActive) => apiClient.patch(`/organizers/${id}/access`, { isActive }),
 };
 
 export default organizersApi;

@@ -73,18 +73,16 @@ const authService = {
     // 3. Hash password
     const password_hash = await bcrypt.hash(password, 10);
 
-    // 4. Create user
+    // 4. Create user - newly registered student starts with pending approval
     const newUser = await userModel.create({
-      college_id,
+      college_id: targetCollegeId,
       name,
       email,
       password_hash,
       role: ROLES.STUDENT,
       created_by: null,
-      is_active: true
+      is_active: false
     });
-
-    const token = generateToken(newUser);
 
     const safeUser = {
       id: newUser.id,
@@ -92,10 +90,73 @@ const authService = {
       email: newUser.email,
       role: newUser.role,
       collegeId: newUser.college_id,
-      collegeName: college.name
+      collegeName: college.name,
+      isActive: false
     };
 
-    return { token, user: safeUser };
+    return {
+      isPendingApproval: true,
+      message: 'Registration submitted successfully! Your account is pending approval from your College Administrator.',
+      user: safeUser
+    };
+  },
+
+  /**
+   * Submits or records an approval request for a student account.
+   *
+   * @param {object} payload - { email }
+   */
+  requestApproval: async ({ email }) => {
+    if (!email) {
+      throw new AppError('Email address is required', 400);
+    }
+
+    const user = await userModel.findByEmail(email);
+    if (!user || user.deleted_at !== null) {
+      return { message: 'If an account exists with this email, an approval request has been notified to your College Administrator.' };
+    }
+
+    if (user.is_active) {
+      return { message: 'Your account is already active and approved. You can log in directly.', isAlreadyActive: true };
+    }
+
+    return {
+      message: `Approval request recorded for ${user.name}. Your College Administrator has been notified to approve your account.`,
+      isPendingApproval: true
+    };
+  },
+
+  /**
+   * Checks if an email domain matches any affiliated college campus.
+   *
+   * @param {object} payload - { email }
+   */
+  checkCampus: async ({ email }) => {
+    if (!email || !email.includes('@')) {
+      return { matched: false };
+    }
+    const emailDomain = email.split('@')[1]?.toLowerCase().trim();
+    if (!emailDomain) {
+      return { matched: false };
+    }
+
+    const activeColleges = await collegeModel.findAllActive();
+    const matched = activeColleges.find(
+      (c) => c.domain && (emailDomain === c.domain.toLowerCase() || emailDomain.endsWith('.' + c.domain.toLowerCase()))
+    );
+
+    if (matched) {
+      return {
+        matched: true,
+        college: {
+          id: matched.id,
+          name: matched.name,
+          domain: matched.domain,
+          code: matched.code
+        }
+      };
+    }
+    return { matched: false };
   },
 
   /**
@@ -104,6 +165,7 @@ const authService = {
    * @param {object} payload - { email, password }
    * @returns {Promise<{ token: string, user: object }>}
    */
+
   login: async ({ email, password }) => {
     const user = await userModel.findByEmail(email);
     if (!user || user.deleted_at !== null) {
@@ -116,8 +178,16 @@ const authService = {
     }
 
     if (!user.is_active) {
+      if (user.role === ROLES.STUDENT) {
+        throw new AppError(
+          'Your student account is pending approval from your College Administrator. An approval request has been sent. Once approved, you can access your student dashboard.',
+          403,
+          [{ field: 'approval', status: 'PENDING_APPROVAL', email: user.email }]
+        );
+      }
       throw new AppError('Your account has been deactivated. Please contact support.', 403);
     }
+
 
     // Tenant check for non-super_admin users
     let collegeName = null;

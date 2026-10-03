@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, QrCode, BarChart2, Pencil } from 'lucide-react';
+import { Plus, Users, BarChart2, Pencil } from 'lucide-react';
 import { ResourceListPage } from '@/components/common/ResourceListPage';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EditEventModal } from '@/components/events/EditEventModal';
+import { EventParticipantsModal } from '@/components/events/EventParticipantsModal';
 import { eventsApi } from '@/api/events';
 import { formatCurrency, formatDateTime } from '@/utils/format';
 
 export const EventsManager = () => {
   const navigate = useNavigate();
   const [editTarget, setEditTarget] = useState(null);
+  const [selectedEventForStudents, setSelectedEventForStudents] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const columns = [
@@ -55,8 +57,20 @@ export const EventsManager = () => {
     {
       key: 'status',
       header: 'Status',
-      render: (row) => <Badge status={row.status || 'PUBLISHED'} />,
+      render: (row) => {
+        const isPast = row.event_date && new Date(row.event_date) < new Date();
+        const displayStatus =
+          (row.status || '').toLowerCase() === 'cancelled'
+            ? 'cancelled'
+            : isPast ||
+              (row.status || '').toLowerCase() === 'completed' ||
+              (row.status || '').toLowerCase() === 'closed'
+            ? 'closed'
+            : row.status || 'published';
+        return <Badge status={displayStatus} />;
+      },
     },
+
     {
       key: 'actions',
       header: 'Actions',
@@ -78,11 +92,11 @@ export const EventsManager = () => {
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/organizer/scanner?eventId=${row.id}`);
+              setSelectedEventForStudents(row);
             }}
-            icon={QrCode}
+            icon={Users}
           >
-            Gate
+            Students
           </Button>
           <Button
             variant="ghost"
@@ -105,7 +119,7 @@ export const EventsManager = () => {
       <ResourceListPage
         key={refreshKey}
         title="Organized Events"
-        subtitle="Manage assigned association events, gate scanners, and registrations"
+        subtitle="Manage assigned association events, registrations, and student attendance"
         breadcrumbs={[
           { label: 'Apps', href: '/apps' },
           { label: 'Events Manager', href: '/organizer/events' },
@@ -126,8 +140,15 @@ export const EventsManager = () => {
         onClose={() => setEditTarget(null)}
         onSuccess={() => setRefreshKey((k) => k + 1)}
       />
+
+      <EventParticipantsModal
+        isOpen={Boolean(selectedEventForStudents)}
+        event={selectedEventForStudents}
+        onClose={() => setSelectedEventForStudents(null)}
+      />
     </>
   );
 };
 
 export default EventsManager;
+

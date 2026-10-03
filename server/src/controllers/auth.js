@@ -20,7 +20,19 @@ const authController = {
   changePassword: async (req, res) => {
     const result = await authService.changePassword(req.user.id, req.body);
     return sendSuccess(res, 200, result.message);
+  },
+
+  requestApproval: async (req, res) => {
+    const result = await authService.requestApproval(req.body);
+    return sendSuccess(res, 200, result.message, result);
+  },
+
+  checkCampus: async (req, res) => {
+    const result = await authService.checkCampus(req.body);
+    return sendSuccess(res, 200, 'Campus check complete', result);
   }
 };
 
 module.exports = authController;
+
+

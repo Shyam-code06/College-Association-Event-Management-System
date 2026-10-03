@@ -83,18 +83,22 @@ const fundraiserModel = {
     return query.orderBy('fundraiser_tasks.created_at', 'asc');
   },
 
-  findStudentTasks: async (studentId, collegeId, { offset = 0, limit = 10 }, trx = db) => {
+  findStudentTasks: async (studentId, collegeId, { offset = 0, limit = 20 }, trx = db) => {
     let query = trx('fundraiser_tasks')
       .select(
         'fundraiser_tasks.*',
         'fundraisers.title as fundraiser_title',
-        'fundraisers.status as fundraiser_status'
+        'fundraisers.organization',
+        'fundraisers.status as fundraiser_status',
+        'fundraisers.event_id',
+        'events.name as event_name'
       )
       .join('fundraisers', 'fundraiser_tasks.fundraiser_id', 'fundraisers.id')
+      .leftJoin('events', 'fundraisers.event_id', 'events.id')
       .where('fundraiser_tasks.assignee_id', studentId);
 
     query = applyTenantScope(query, collegeId, 'fundraiser_tasks');
-    return query.orderBy('fundraiser_tasks.due_date', 'asc').offset(offset).limit(limit);
+    return query.orderBy('fundraiser_tasks.created_at', 'desc').offset(offset).limit(limit);
   },
 
   countStudentTasks: async (studentId, collegeId, trx = db) => {
@@ -109,6 +113,50 @@ const fundraiserModel = {
     query = applyTenantScope(query, collegeId);
     await query.update(updateData);
     return trx('fundraiser_tasks').where({ id, college_id: collegeId }).first();
+  },
+
+  respondToInvitation: async (taskId, studentId, collegeId, action, trx = db) => {
+    let query = trx('fundraiser_tasks').where({
+      id: taskId,
+      assignee_id: studentId
+    });
+    query = applyTenantScope(query, collegeId);
+    const task = await query.first();
+    if (!task) {
+      const AppError = require('../utils/appError');
+      throw new AppError('Volunteer invitation not found', 404);
+    }
+
+    if (task.invitation_deadline) {
+      const today = new Date().toISOString().split('T')[0];
+      if (task.invitation_deadline < today) {
+        await query.update({ invitation_status: 'expired' });
+        const AppError = require('../utils/appError');
+        throw new AppError('This volunteer invitation deadline has passed and is expired', 400);
+      }
+    }
+
+    const newInvStatus = action === 'accept' ? 'accepted' : 'declined';
+    const newTaskStatus = action === 'accept' ? 'in_progress' : 'completed';
+
+    await query.update({
+      invitation_status: newInvStatus,
+      status: newTaskStatus
+    });
+
+    return query.first();
+  },
+
+  checkIfStudentIsVolunteerForEvent: async (studentId, eventId, collegeId, trx = db) => {
+    let query = trx('fundraiser_tasks')
+      .join('fundraisers', 'fundraiser_tasks.fundraiser_id', 'fundraisers.id')
+      .where('fundraiser_tasks.assignee_id', studentId)
+      .where('fundraisers.event_id', eventId)
+      .whereIn('fundraiser_tasks.invitation_status', ['pending', 'accepted']);
+
+    query = applyTenantScope(query, collegeId, 'fundraiser_tasks');
+    const match = await query.first();
+    return Boolean(match);
   },
 
   getProgressSummary: async (fundraiserId, collegeId, trx = db) => {

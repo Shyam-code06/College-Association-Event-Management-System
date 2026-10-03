@@ -41,9 +41,14 @@ apiClient.interceptors.response.use(
     if (status === 401) {
       useAuthStore.getState().clearAuth();
       try {
-        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        if (
+          typeof window !== 'undefined' &&
+          window.location.pathname !== '/login' &&
+          window.location.pathname !== '/register'
+        ) {
           window.location.href = '/login';
         }
+
       } catch (e) {
         // Navigation not available in test environment
       }

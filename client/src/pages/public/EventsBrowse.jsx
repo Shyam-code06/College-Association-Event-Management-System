@@ -80,8 +80,13 @@ export const EventsBrowse = () => {
       ) : filteredEvents.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredEvents.map((ev) => {
+            const isPast = ev.event_date && new Date(ev.event_date) < new Date();
+            const isClosed =
+              isPast ||
+              (ev.status || '').toLowerCase() === 'completed' ||
+              (ev.status || '').toLowerCase() === 'closed';
             const isSoldOut = ev.available_seats !== undefined && ev.available_seats <= 0;
-            const isCancelled = ev.status === 'CANCELLED';
+            const isCancelled = (ev.status || '').toLowerCase() === 'cancelled';
 
             return (
               <Card
@@ -90,10 +95,20 @@ export const EventsBrowse = () => {
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-3">
-                    <Badge status={ev.status || 'PUBLISHED'} />
+                    <Badge
+                      status={
+                        isCancelled
+                          ? 'cancelled'
+                          : isClosed
+                          ? 'closed'
+                          : ev.status || 'published'
+                      }
+                    />
                     <span className="text-xs font-semibold text-muted flex items-center gap-1">
                       <Users className="h-3.5 w-3.5" />
-                      {ev.available_seats !== undefined
+                      {isClosed
+                        ? 'Event Concluded'
+                        : ev.available_seats !== undefined
                         ? `${ev.available_seats} seats left`
                         : `${ev.capacity} capacity`}
                     </span>
@@ -141,15 +156,17 @@ export const EventsBrowse = () => {
 
                 <div className="mt-6 pt-2">
                   <Button
-                    variant="primary"
+                    variant={isClosed || isCancelled || isSoldOut ? 'outline' : 'primary'}
                     size="md"
                     className="w-full justify-center"
-                    disabled={isSoldOut || isCancelled}
+                    disabled={isSoldOut || isCancelled || isClosed}
                     onClick={() => handleRegisterClick(ev.id)}
-                    icon={!isSoldOut && !isCancelled ? ArrowRight : undefined}
+                    icon={!isSoldOut && !isCancelled && !isClosed ? ArrowRight : undefined}
                   >
                     {isCancelled
                       ? 'Event Cancelled'
+                      : isClosed
+                      ? 'Event Closed'
                       : isSoldOut
                       ? 'Sold Out'
                       : 'Register Now'}
@@ -158,6 +175,7 @@ export const EventsBrowse = () => {
               </Card>
             );
           })}
+
         </div>
       ) : (
         <EmptyState

@@ -15,11 +15,13 @@ export const STATUS_STYLES = Object.freeze({
   submitted: 'bg-info/15 text-info border-info/30',
   draft: 'bg-muted/15 text-muted border-line',
 
-  // Cancelled / Failed / Danger
+  // Cancelled / Failed / Danger / Closed
   expired: 'bg-danger/15 text-danger border-danger/30',
   cancelled: 'bg-danger/15 text-danger border-danger/30',
+  closed: 'bg-muted/20 text-muted border-line',
   failed: 'bg-danger/15 text-danger border-danger/30',
   rejected: 'bg-danger/15 text-danger border-danger/30',
+
 
   // Transaction types
   income: 'bg-success/15 text-success border-success/30',

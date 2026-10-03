@@ -15,5 +15,9 @@ router.post('/register', validate(registerSchema), asyncHandler(authController.r
 router.post('/login', validate(loginSchema), asyncHandler(authController.login));
 router.get('/me', auth, asyncHandler(authController.getMe));
 router.post('/change-password', auth, validate(changePasswordSchema), asyncHandler(authController.changePassword));
+router.post('/request-approval', asyncHandler(authController.requestApproval));
+router.post('/check-campus', asyncHandler(authController.checkCampus));
 
 module.exports = router;
+
+

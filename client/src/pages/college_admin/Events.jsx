@@ -72,8 +72,20 @@ export const AdminEvents = () => {
     {
       key: 'status',
       header: 'Status',
-      render: (row) => <Badge status={row.status || 'PUBLISHED'} />,
+      render: (row) => {
+        const isPast = row.event_date && new Date(row.event_date) < new Date();
+        const displayStatus =
+          (row.status || '').toLowerCase() === 'cancelled'
+            ? 'cancelled'
+            : isPast ||
+              (row.status || '').toLowerCase() === 'completed' ||
+              (row.status || '').toLowerCase() === 'closed'
+            ? 'closed'
+            : row.status || 'published';
+        return <Badge status={displayStatus} />;
+      },
     },
+
     {
       key: 'actions',
       header: 'Actions',

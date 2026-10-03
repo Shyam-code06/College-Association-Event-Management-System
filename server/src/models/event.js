@@ -12,6 +12,17 @@ const eventModel = {
   },
 
   findById: async (id, collegeId, trx = db) => {
+    try {
+      await trx('events')
+        .where('id', id)
+        .where('college_id', collegeId)
+        .where('status', EVENT_STATUS.PUBLISHED)
+        .where('event_date', '<', trx.fn.now())
+        .update({ status: EVENT_STATUS.COMPLETED });
+    } catch (e) {
+      // Ignore
+    }
+
     let query = trx('events')
       .select(
         'events.*',
@@ -47,7 +58,18 @@ const eventModel = {
   },
 
   findAll: async (collegeId, { status, upcomingOnly = false, search, offset = 0, limit = 10 }, trx = db) => {
+    try {
+      await trx('events')
+        .where('college_id', collegeId)
+        .where('status', EVENT_STATUS.PUBLISHED)
+        .where('event_date', '<', trx.fn.now())
+        .update({ status: EVENT_STATUS.COMPLETED });
+    } catch (e) {
+      // Ignore
+    }
+
     let query = trx('events')
+
       .select(
         'events.*',
         'events.name as title',

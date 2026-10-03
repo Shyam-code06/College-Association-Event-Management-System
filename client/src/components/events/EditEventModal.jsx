@@ -65,9 +65,14 @@ export const EditEventModal = ({ isOpen, onClose, event, onSuccess }) => {
 
     // Validation
     const newErrors = {};
+    const today = new Date().toISOString().split('T')[0];
     if (!formData.name?.trim()) newErrors.name = 'Event name is required';
     if (!formData.location?.trim()) newErrors.location = 'Venue/location is required';
-    if (!formData.event_date) newErrors.event_date = 'Event date is required';
+    if (!formData.event_date) {
+      newErrors.event_date = 'Event date is required';
+    } else if (formData.event_date < today) {
+      newErrors.event_date = 'Event date cannot be in the past';
+    }
     if (!formData.capacity || Number(formData.capacity) <= 0) {
       newErrors.capacity = 'Capacity must be greater than 0';
     }
@@ -76,6 +81,7 @@ export const EditEventModal = ({ isOpen, onClose, event, onSuccess }) => {
       setErrors(newErrors);
       return;
     }
+
 
     setLoading(true);
     try {
@@ -128,10 +134,12 @@ export const EditEventModal = ({ isOpen, onClose, event, onSuccess }) => {
           <FormField label="Event Date" required error={errors.event_date}>
             <Input
               type="date"
+              min={new Date().toISOString().split('T')[0]}
               value={formData.event_date}
               onChange={(e) => handleChange('event_date', e.target.value)}
             />
           </FormField>
+
 
           <FormField label="Start Time" required>
             <Input

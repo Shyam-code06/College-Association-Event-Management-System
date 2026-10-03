@@ -10,6 +10,7 @@ const {
   createPlanSchema,
   updatePlanSchema,
   joinMembershipSchema,
+  adminCreateMembershipSchema,
   listMembersSchema,
   verifyMemberSchema
 } = require('../validations/memberships');
@@ -62,6 +63,21 @@ router.get(
   authorize(ROLES.COLLEGE_ADMIN),
   validate(listMembersSchema, 'query'),
   asyncHandler(membershipsController.listMembers)
+);
+
+// College Admin: add/grant membership for an organization
+router.post(
+  '/admin-create',
+  authorize(ROLES.COLLEGE_ADMIN),
+  validate(adminCreateMembershipSchema),
+  asyncHandler(membershipsController.adminCreateMembership)
+);
+
+// College Admin: delete membership created by any organization
+router.delete(
+  '/:id',
+  authorize(ROLES.COLLEGE_ADMIN),
+  asyncHandler(membershipsController.deleteMembership)
 );
 
 // College Admin & Organizer: verify member status at gate
