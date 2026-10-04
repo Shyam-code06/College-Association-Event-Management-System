@@ -53,14 +53,14 @@ export const StudentAnnouncements = () => {
                 <Badge status={item.priority || 'INFO'} />
                 <span className="text-xs text-muted flex items-center gap-1">
                   <Calendar className="h-3.5 w-3.5" />
-                  {formatDateTime(item.created_at)}
+                  {formatDateTime(item.created_at || item.createdAt)}
                 </span>
               </div>
 
               <h3 className="text-base font-bold text-ink">{item.title}</h3>
 
               <p className="text-sm text-ink/80 leading-relaxed whitespace-pre-line">
-                {item.content}
+                {item.content || item.message}
               </p>
             </Card>
           ))}

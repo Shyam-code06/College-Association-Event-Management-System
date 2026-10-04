@@ -16,27 +16,95 @@ const paymentsService = {
   },
 
   /**
+   * Retrieves all or filtered payments (Pending, Approved, All) for College Admin.
+   *
+   * @param {number} collegeId
+   * @param {object} queryParams
+   */
+  getAllPayments: async (collegeId, queryParams) => {
+    const { page, limit, offset } = getPaginationParams(queryParams);
+    const { status, search } = queryParams;
+
+    const payments = await paymentModel.findAllPayments(collegeId, { status, search, offset, limit });
+    const total = await paymentModel.countAllPayments(collegeId, { status, search });
+
+    const formatted = payments.map((p) => {
+      const typeLabel =
+        p.payable_type === 'membership' ? 'Membership Dues' :
+        p.payable_type === 'registration' ? 'Event Registration' :
+        p.payable_type === 'order' ? 'Merchandise Order' :
+        p.payable_type;
+
+      return {
+        id: p.id,
+        collegeId: p.college_id,
+        user_name: p.student_name || 'Student',
+        user_email: p.student_email || '',
+        studentName: p.student_name || 'Student',
+        studentEmail: p.student_email || '',
+        payment_type: typeLabel,
+        payable_type: p.payable_type,
+        payable_id: p.payable_id,
+        reason: `${typeLabel} #${p.payable_id}`,
+        amount: parseFloat(p.amount),
+        status: p.status,
+        transactionRef: p.transaction_ref,
+        transaction_ref: p.transaction_ref,
+        created_at: p.created_at,
+        createdAt: p.created_at,
+        paid_at: p.paid_at
+      };
+    });
+
+    return {
+      data: formatted,
+      meta: buildPaginationMeta(total, page, limit)
+    };
+  },
+
+  /**
    * Retrieves pending payments for College Admin.
    *
    * @param {number} collegeId
    * @param {object} queryParams
    */
   getPendingPayments: async (collegeId, queryParams) => {
+    // If status filter is explicitly passed (e.g. 'all', 'approved', 'success'), delegate to getAllPayments
+    if (queryParams.status && queryParams.status !== 'pending') {
+      return paymentsService.getAllPayments(collegeId, queryParams);
+    }
+
     const { page, limit, offset } = getPaginationParams(queryParams);
     const payments = await paymentModel.findPendingPayments(collegeId, { offset, limit });
     const total = await paymentModel.countPendingPayments(collegeId);
 
-    const formatted = payments.map((p) => ({
-      id: p.id,
-      collegeId: p.college_id,
-      studentName: p.student_name,
-      studentEmail: p.student_email,
-      reason: `${p.payable_type.toUpperCase()} #${p.payable_id}`,
-      amount: parseFloat(p.amount),
-      status: p.status,
-      transactionRef: p.transaction_ref,
-      createdAt: p.created_at
-    }));
+    const formatted = payments.map((p) => {
+      const typeLabel =
+        p.payable_type === 'membership' ? 'Membership Dues' :
+        p.payable_type === 'registration' ? 'Event Registration' :
+        p.payable_type === 'order' ? 'Merchandise Order' :
+        p.payable_type;
+
+      return {
+        id: p.id,
+        collegeId: p.college_id,
+        user_name: p.student_name || 'Student',
+        user_email: p.student_email || '',
+        studentName: p.student_name || 'Student',
+        studentEmail: p.student_email || '',
+        payment_type: typeLabel,
+        payable_type: p.payable_type,
+        payable_id: p.payable_id,
+        reason: `${typeLabel} #${p.payable_id}`,
+        amount: parseFloat(p.amount),
+        status: p.status,
+        transactionRef: p.transaction_ref,
+        transaction_ref: p.transaction_ref,
+        created_at: p.created_at,
+        createdAt: p.created_at,
+        paid_at: p.paid_at
+      };
+    });
 
     return {
       data: formatted,

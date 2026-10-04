@@ -21,8 +21,9 @@ const EventsBrowse = lazy(() => import('@/pages/public/EventsBrowse'));
 const Forbidden = lazy(() => import('@/pages/public/Forbidden'));
 const NotFound = lazy(() => import('@/pages/public/NotFound'));
 
-// App Launcher
+// App Launcher & Shared
 const Apps = lazy(() => import('@/pages/launcher/Apps'));
+const ChangePassword = lazy(() => import('@/pages/shared/ChangePassword'));
 
 // Student Pages
 const StudentDashboard = lazy(() => import('@/pages/student/Dashboard'));
@@ -126,6 +127,15 @@ export const router = createBrowserRouter([
           </Suspense>
         ),
       },
+      // Security & Password Settings (accessible by all authenticated roles)
+      {
+        path: '/settings/security',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <ChangePassword />
+          </Suspense>
+        ),
+      },
 
       // Student Routes
       {
@@ -191,7 +201,17 @@ export const router = createBrowserRouter([
       {
         path: '/student/expenses',
         element: (
-          <ProtectedRoute allowedRoles={[ROLES.STUDENT, ROLES.ORGANIZER]}>
+          <ProtectedRoute allowedRoles={[ROLES.ORGANIZER]}>
+            <Suspense fallback={<PageLoader />}>
+              <MyExpenses />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/organizer/expenses',
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ORGANIZER]}>
             <Suspense fallback={<PageLoader />}>
               <MyExpenses />
             </Suspense>
@@ -260,6 +280,26 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      {
+        path: '/organizer/plans',
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ORGANIZER, ROLES.COLLEGE_ADMIN]}>
+            <Suspense fallback={<PageLoader />}>
+              <Plans />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/organizer/members',
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ORGANIZER, ROLES.COLLEGE_ADMIN]}>
+            <Suspense fallback={<PageLoader />}>
+              <Members />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
 
       // College Admin Routes
       {
@@ -318,6 +358,16 @@ export const router = createBrowserRouter([
           <ProtectedRoute allowedRoles={[ROLES.COLLEGE_ADMIN]}>
             <Suspense fallback={<PageLoader />}>
               <AdminEvents />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/admin/scanner',
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.COLLEGE_ADMIN]}>
+            <Suspense fallback={<PageLoader />}>
+              <GateScanner />
             </Suspense>
           </ProtectedRoute>
         ),

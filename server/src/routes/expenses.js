@@ -17,19 +17,19 @@ const router = express.Router();
 
 router.use(auth, tenant);
 
-// Student & Organizer: submit expense with receipt
+// Organizer: submit expense with receipt
 router.post(
   '/',
-  authorize(ROLES.STUDENT, ROLES.ORGANIZER),
+  authorize(ROLES.ORGANIZER),
   uploadReceipt.single('receipt'),
   validate(submitExpenseSchema),
   asyncHandler(expensesController.submit)
 );
 
-// Student & Organizer: personal submitted expenses
+// Organizer: personal submitted expenses
 router.get(
   '/me',
-  authorize(ROLES.STUDENT, ROLES.ORGANIZER),
+  authorize(ROLES.ORGANIZER),
   asyncHandler(expensesController.getStudentExpenses)
 );
 
@@ -44,7 +44,7 @@ router.get(
 // College Admin & Submitter: view single expense
 router.get(
   '/:id',
-  authorize(ROLES.COLLEGE_ADMIN, ROLES.STUDENT, ROLES.ORGANIZER),
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
   asyncHandler(expensesController.getById)
 );
 

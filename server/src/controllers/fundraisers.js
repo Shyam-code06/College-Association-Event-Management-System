@@ -27,6 +27,11 @@ const fundraisersController = {
     return sendSuccess(res, 201, 'Fundraiser task created and assigned successfully', task);
   },
 
+  getTasksByFundraiser: async (req, res) => {
+    const tasks = await fundraisersService.getTasksByFundraiser(req.params.id, req.collegeId);
+    return sendSuccess(res, 200, 'Tasks retrieved successfully', tasks);
+  },
+
   getStudentTasks: async (req, res) => {
     const result = await fundraisersService.getStudentTasks(req.user.id, req.collegeId, req.query);
     return sendSuccess(res, 200, 'Student tasks retrieved successfully', result.data, result.meta);

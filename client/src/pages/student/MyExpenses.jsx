@@ -207,8 +207,8 @@ export const MyExpenses = () => {
   const columns = [
     {
       key: 'id',
-      header: 'Claim #',
-      render: (row) => <span className="font-mono font-semibold">#{row.id}</span>,
+      header: 'Claim ID',
+      render: (row) => <span className="font-mono font-semibold">{row.id}</span>,
     },
     {
       key: 'amount',
@@ -273,14 +273,14 @@ export const MyExpenses = () => {
   return (
     <ResourceListPage
       key={refreshKey}
-      title="Expense Reimbursements"
-      subtitle="Submit bills and track payment status for association expenses"
+      title="Organizer Expense Reimbursements"
+      subtitle="Submit bills and track reimbursement approval for association event expenses"
       breadcrumbs={[
         {
-          label: user?.role === 'organizer' ? 'Organizer Hub' : 'Student Hub',
-          href: user?.role === 'organizer' ? '/organizer/events' : '/student/dashboard'
+          label: 'Organizer Hub',
+          href: '/organizer/events'
         },
-        { label: 'Expenses', href: '/student/expenses' },
+        { label: 'Expenses', href: '/organizer/expenses' },
       ]}
       api={expensesApi.getMyExpenses}
       columns={columns}

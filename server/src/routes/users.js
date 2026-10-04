@@ -10,10 +10,11 @@ const { listCollegeUsersSchema, toggleUserStatusSchema, approveAllUsersSchema } 
 
 const router = express.Router();
 
-router.use(auth, authorize(ROLES.COLLEGE_ADMIN), tenant);
+router.use(auth, tenant);
 
 router.get(
   '/',
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
   validate(listCollegeUsersSchema, 'query'),
   asyncHandler(usersController.listCollegeUsers)
 );

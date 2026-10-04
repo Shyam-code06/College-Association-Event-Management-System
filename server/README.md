@@ -194,8 +194,8 @@ npm start
 ### Initial Seed Logins
 
 1. **Super Admin**:
-   - Email: `superadmin@skyline.edu`
-   - Password: `SuperAdmin@123`
+   - Email: `superadmin@odoo.com`
+   - Password: `123456`
 2. **Demo College Admin** (Skyline Institute of Technology):
    - Email: `collegeadmin@skyline.edu`
    - Password: `CollegeAdmin@123`

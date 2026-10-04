@@ -3,10 +3,14 @@ const { applyTenantScope } = require('../utils/tenantScope');
 
 const announcementModel = {
   create: async (collegeId, data, trx = db) => {
-    const [id] = await trx('announcements').insert({
+    const insertPayload = {
       college_id: collegeId,
-      ...data
-    });
+      title: data.title,
+      message: data.message || data.content || '',
+      priority: data.priority || 'INFO',
+      posted_by: data.posted_by || data.created_by || null
+    };
+    const [id] = await trx('announcements').insert(insertPayload);
     return trx('announcements').where({ id, college_id: collegeId }).first();
   },
 

@@ -8,12 +8,21 @@ const asyncHandler = require('../utils/asyncHandler');
 const { ROLES } = require('../constants/roles');
 const {
   processPaymentSchema,
-  listPendingPaymentsSchema
+  listPendingPaymentsSchema,
+  listPaymentsSchema
 } = require('../validations/payments');
 
 const router = express.Router();
 
 router.use(auth, tenant);
+
+// College Admin: all or filtered payments (pending, approved, all)
+router.get(
+  '/',
+  authorize(ROLES.COLLEGE_ADMIN),
+  validate(listPaymentsSchema, 'query'),
+  asyncHandler(paymentsController.getAllPayments)
+);
 
 // Student & College Admin can process payment (mock gateway trigger)
 router.post(

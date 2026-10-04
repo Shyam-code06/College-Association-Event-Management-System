@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Menu, Transition } from '@headlessui/react';
 import {
@@ -8,13 +8,16 @@ import {
   Shield,
   Sparkles,
   ChevronDown,
+  KeyRound,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth';
 import { ROLES } from '@/utils/constants';
+import { ChangePasswordModal } from '@/components/common/ChangePasswordModal';
 
 export const Topbar = () => {
   const navigate = useNavigate();
   const { user, clearAuth } = useAuthStore();
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   const handleLogout = () => {
     clearAuth();
@@ -131,6 +134,20 @@ export const Topbar = () => {
                       )}
                     </Menu.Item>
                   )}
+
+                  <Menu.Item>
+                    {({ active }) => (
+                      <button
+                        onClick={() => setIsChangePasswordOpen(true)}
+                        className={`${
+                          active ? 'bg-canvas text-primary' : 'text-ink'
+                        } group flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-xs font-medium cursor-pointer`}
+                      >
+                        <KeyRound className="h-4 w-4 text-muted group-hover:text-primary" />
+                        Change Password
+                      </button>
+                    )}
+                  </Menu.Item>
                 </div>
 
                 <div className="p-1">
@@ -153,6 +170,12 @@ export const Topbar = () => {
           </Menu>
         </div>
       </div>
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+      />
     </header>
   );
 };

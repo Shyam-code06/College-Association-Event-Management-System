@@ -8,7 +8,8 @@ const { ROLES } = require('../constants/roles');
 const {
   createCollegeAdminSchema,
   toggleAccessSchema,
-  listCollegeAdminsSchema
+  listCollegeAdminsSchema,
+  resetCollegeAdminPasswordSchema
 } = require('../validations/collegeAdmins');
 
 const router = express.Router();
@@ -37,6 +38,12 @@ router.patch(
   '/:id/access',
   validate(toggleAccessSchema),
   asyncHandler(collegeAdminsController.toggleAccess)
+);
+
+router.post(
+  '/:id/reset-password',
+  validate(resetCollegeAdminPasswordSchema),
+  asyncHandler(collegeAdminsController.resetPassword)
 );
 
 router.delete(

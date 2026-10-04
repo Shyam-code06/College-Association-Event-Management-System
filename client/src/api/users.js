@@ -5,6 +5,10 @@ export const usersApi = {
     apiClient.get('/users', {
       params: { ...params, role: 'student' },
     }),
+  listOrganizers: (params = {}) =>
+    apiClient.get('/users', {
+      params: { ...params, role: 'organizer' },
+    }),
   listCollegeUsers: (params = {}) =>
     apiClient.get('/users', { params }),
   toggleStatus: (id, isActive) =>

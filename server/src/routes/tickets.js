@@ -6,7 +6,7 @@ const tenant = require('../middlewares/tenant');
 const validate = require('../middlewares/validate');
 const asyncHandler = require('../utils/asyncHandler');
 const { ROLES } = require('../constants/roles');
-const { scanTicketSchema } = require('../validations/tickets');
+const { scanTicketSchema, deleteAttendanceSchema } = require('../validations/tickets');
 
 const router = express.Router();
 
@@ -25,6 +25,21 @@ router.post(
   authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
   validate(scanTicketSchema),
   asyncHandler(ticketsController.scan)
+);
+
+// Organizer & College Admin: delete/revoke attendance
+router.delete(
+  '/attendance',
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
+  validate(deleteAttendanceSchema),
+  asyncHandler(ticketsController.deleteAttendance)
+);
+
+router.post(
+  '/attendance/delete',
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
+  validate(deleteAttendanceSchema),
+  asyncHandler(ticketsController.deleteAttendance)
 );
 
 module.exports = router;

@@ -1,3 +1,4 @@
+const db = require('../config/database');
 const registrationModel = require('../models/registration');
 const paymentModel = require('../models/payment');
 const { generateQrDataUrl } = require('./qr');
@@ -92,6 +93,8 @@ const ticketsService = {
         success: false,
         reason: CHECKIN_ERROR.ALREADY_USED,
         message: 'Ticket has already been scanned and checked in',
+        registrationId: registration.id,
+        attendeeName: registration.user_name,
         checkedInAt: registration.checked_in_at
       };
     }
@@ -115,12 +118,52 @@ const ticketsService = {
       success: true,
       message: 'Check-in successful',
       attendee: {
+        registrationId: registration.id,
+        qrToken: registration.qr_token,
         name: registration.user_name,
         email: registration.user_email,
         eventName: registration.event_name,
         isMember: Boolean(registration.is_member_at_registration),
         checkedInAt: new Date().toISOString()
       }
+    };
+  },
+
+  /**
+   * Deletes / revokes attendance for an attendee.
+   * Resets checked_in_at and checked_in_by to null.
+   */
+  deleteAttendance: async (collegeId, organizerId, { registrationId, qrToken, reason }) => {
+    let registration;
+    if (registrationId) {
+      registration = await registrationModel.findById(registrationId, collegeId);
+    } else if (qrToken) {
+      registration = await registrationModel.findByQrToken(qrToken, collegeId);
+    }
+
+    if (!registration) {
+      throw new AppError('Ticket registration not found', 404);
+    }
+
+    if (!registration.checked_in_at) {
+      throw new AppError('This ticket is not currently marked as checked-in', 400);
+    }
+
+    await db('registrations')
+      .where('id', registration.id)
+      .where('college_id', collegeId)
+      .update({
+        checked_in_at: null,
+        checked_in_by: null,
+        updated_at: db.fn.now()
+      });
+
+    return {
+      registrationId: registration.id,
+      attendeeName: registration.user_name || registration.name || 'Attendee',
+      reason,
+      deletedBy: organizerId,
+      deletedAt: new Date().toISOString()
     };
   }
 };

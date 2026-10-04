@@ -130,7 +130,9 @@ const fundraiserModel = {
     if (task.invitation_deadline) {
       const today = new Date().toISOString().split('T')[0];
       if (task.invitation_deadline < today) {
-        await query.update({ invitation_status: 'expired' });
+        await trx('fundraiser_tasks')
+          .where({ id: taskId, college_id: collegeId })
+          .update({ invitation_status: 'expired' });
         const AppError = require('../utils/appError');
         throw new AppError('This volunteer invitation deadline has passed and is expired', 400);
       }
@@ -139,12 +141,16 @@ const fundraiserModel = {
     const newInvStatus = action === 'accept' ? 'accepted' : 'declined';
     const newTaskStatus = action === 'accept' ? 'in_progress' : 'completed';
 
-    await query.update({
-      invitation_status: newInvStatus,
-      status: newTaskStatus
-    });
+    await trx('fundraiser_tasks')
+      .where({ id: taskId, college_id: collegeId })
+      .update({
+        invitation_status: newInvStatus,
+        status: newTaskStatus
+      });
 
-    return query.first();
+    return trx('fundraiser_tasks')
+      .where({ id: taskId, college_id: collegeId })
+      .first();
   },
 
   checkIfStudentIsVolunteerForEvent: async (studentId, eventId, collegeId, trx = db) => {

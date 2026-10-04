@@ -86,6 +86,67 @@ const paymentModel = {
     query = applyTenantScope(query, collegeId);
     const result = await query.count('id as count').first();
     return parseInt(result.count, 10);
+  },
+
+  findAllPayments: async (collegeId, { status, search, offset = 0, limit = 10 }, trx = db) => {
+    let query = trx('payments')
+      .select(
+        'payments.*',
+        'users.name as student_name',
+        'users.email as student_email'
+      )
+      .join('users', 'payments.user_id', 'users.id');
+
+    query = applyTenantScope(query, collegeId, 'payments');
+
+    if (status && status !== 'all') {
+      if (status === 'approved' || status === 'success') {
+        query = query.whereIn('payments.status', [PAYMENT_STATUS.SUCCESS, 'approved']);
+      } else if (status === 'pending') {
+        query = query.where('payments.status', PAYMENT_STATUS.PENDING);
+      } else {
+        query = query.where('payments.status', status);
+      }
+    }
+
+    if (search) {
+      query = query.where((q) => {
+        q.where('users.name', 'like', `%${search}%`)
+          .orWhere('users.email', 'like', `%${search}%`)
+          .orWhere('payments.transaction_ref', 'like', `%${search}%`)
+          .orWhere('payments.payable_type', 'like', `%${search}%`);
+      });
+    }
+
+    return query.orderBy('payments.created_at', 'desc').offset(offset).limit(limit);
+  },
+
+  countAllPayments: async (collegeId, { status, search }, trx = db) => {
+    let query = trx('payments')
+      .join('users', 'payments.user_id', 'users.id');
+    query = applyTenantScope(query, collegeId, 'payments');
+
+    if (status && status !== 'all') {
+      if (status === 'approved' || status === 'success') {
+        query = query.whereIn('payments.status', [PAYMENT_STATUS.SUCCESS, 'approved']);
+      } else if (status === 'pending') {
+        query = query.where('payments.status', PAYMENT_STATUS.PENDING);
+      } else {
+        query = query.where('payments.status', status);
+      }
+    }
+
+    if (search) {
+      query = query.where((q) => {
+        q.where('users.name', 'like', `%${search}%`)
+          .orWhere('users.email', 'like', `%${search}%`)
+          .orWhere('payments.transaction_ref', 'like', `%${search}%`)
+          .orWhere('payments.payable_type', 'like', `%${search}%`);
+      });
+    }
+
+    const result = await query.count('payments.id as count').first();
+    return parseInt(result?.count || 0, 10);
   }
 };
 

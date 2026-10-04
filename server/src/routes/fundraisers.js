@@ -82,6 +82,12 @@ router.put(
   asyncHandler(fundraisersController.updateFundraiser)
 );
 
+router.get(
+  '/:id/tasks',
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
+  asyncHandler(fundraisersController.getTasksByFundraiser)
+);
+
 router.post(
   '/:id/tasks',
   authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),

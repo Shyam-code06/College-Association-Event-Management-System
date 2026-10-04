@@ -10,24 +10,64 @@ const membershipModel = {
     return query.first();
   },
 
-  findAllPlans: async (collegeId, trx = db) => {
-    let query = trx('membership_plans').where('is_active', true);
+  findAllPlans: async (collegeId, options = {}, trx = db) => {
+    let query = trx('membership_plans');
     query = applyTenantScope(query, collegeId);
-    return query.orderBy('fee', 'asc');
+
+    if (options.role === 'student') {
+      query = query.where('is_active', true).where('approval_status', 'approved');
+    } else if (options.role === 'organizer' && options.userEmail) {
+      const email = options.userEmail.toLowerCase().trim();
+      query = query.where(function () {
+        this.where('created_by', options.userId)
+          .orWhere('assigned_organizers', 'like', `%${email}%`)
+          .orWhere(function () {
+            this.where('is_active', true).where('approval_status', 'approved');
+          });
+      });
+    }
+
+    if (options.status) {
+      query = query.where('approval_status', options.status);
+    }
+
+    const plans = await query.orderBy('fee', 'asc');
+    return plans.map((p) => {
+      let assigned = [];
+      if (p.assigned_organizers) {
+        try {
+          assigned = typeof p.assigned_organizers === 'string' ? JSON.parse(p.assigned_organizers) : p.assigned_organizers;
+        } catch {
+          assigned = p.assigned_organizers.split(',').map((s) => s.trim());
+        }
+      }
+      return {
+        ...p,
+        assigned_organizers: Array.isArray(assigned) ? assigned : [assigned]
+      };
+    });
   },
 
   createPlan: async (collegeId, planData, trx = db) => {
+    const payload = { ...planData };
+    if (Array.isArray(payload.assigned_organizers)) {
+      payload.assigned_organizers = JSON.stringify(payload.assigned_organizers);
+    }
     const [id] = await trx('membership_plans').insert({
       college_id: collegeId,
-      ...planData
+      ...payload
     });
     return trx('membership_plans').where({ id, college_id: collegeId }).first();
   },
 
   updatePlan: async (id, collegeId, updateData, trx = db) => {
+    const payload = { ...updateData };
+    if (Array.isArray(payload.assigned_organizers)) {
+      payload.assigned_organizers = JSON.stringify(payload.assigned_organizers);
+    }
     let query = trx('membership_plans').where('id', id);
     query = applyTenantScope(query, collegeId);
-    await query.update(updateData);
+    await query.update(payload);
     return trx('membership_plans').where({ id, college_id: collegeId }).first();
   },
 

@@ -30,9 +30,25 @@ const authController = {
   checkCampus: async (req, res) => {
     const result = await authService.checkCampus(req.body);
     return sendSuccess(res, 200, 'Campus check complete', result);
+  },
+
+  forgotPasswordRequest: async (req, res) => {
+    const result = await authService.forgotPasswordRequest(req.body);
+    return sendSuccess(res, 200, result.message, result);
+  },
+
+  verifyResetOtp: async (req, res) => {
+    const result = await authService.verifyResetOtp(req.body);
+    return sendSuccess(res, 200, result.message, result);
+  },
+
+  resetPasswordWithOtp: async (req, res) => {
+    const result = await authService.resetPasswordWithOtp(req.body);
+    return sendSuccess(res, 200, result.message, result);
   }
 };
 
 module.exports = authController;
+
 
 

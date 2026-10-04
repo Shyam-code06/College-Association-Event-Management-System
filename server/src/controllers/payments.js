@@ -12,6 +12,11 @@ const paymentsController = {
     return sendSuccess(res, 200, 'Payment processed successfully', result);
   },
 
+  getAllPayments: async (req, res) => {
+    const result = await paymentsService.getAllPayments(req.collegeId, req.query);
+    return sendSuccess(res, 200, 'Payments retrieved successfully', result.data, result.meta);
+  },
+
   getPendingPayments: async (req, res) => {
     const result = await paymentsService.getPendingPayments(req.collegeId, req.query);
     return sendSuccess(res, 200, 'Pending payments retrieved successfully', result.data, result.meta);

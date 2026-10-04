@@ -75,9 +75,14 @@ CREATE TABLE membership_plans (
   ticket_discount_note VARCHAR(255) NULL,
   merch_discount_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  organization VARCHAR(150) NULL DEFAULT 'Odoo Student Association',
+  created_by INT NULL,
+  approval_status ENUM('approved', 'pending_approval', 'rejected') NOT NULL DEFAULT 'approved',
+  assigned_organizers TEXT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE RESTRICT,
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT chk_plan_fee CHECK (fee >= 0),
   CONSTRAINT chk_plan_duration CHECK (duration_months > 0),
   CONSTRAINT chk_merch_discount CHECK (merch_discount_percent >= 0 AND merch_discount_percent <= 100),
@@ -407,8 +412,8 @@ VALUES (
   1,
   NULL,
   'Super Admin',
-  'superadmin@skyline.edu',
-  '$2b$10$MGFEaX5KmAXngcyUXQRTJOQsMXApIkeYFjLNvmW8wuO9MW5D9qab2',
+  'superadmin@odoo.com',
+  '$2b$10$m1c35mSXMudNcgv0RGxUdu6sZZ4SExHENyCQibC7sCz7jbYjehpbW',
   'super_admin',
   NULL,
   TRUE
@@ -567,3 +572,16 @@ VALUES
 (12, 1, 'Venue Rental', 'expense'),
 (13, 1, 'Equipment', 'expense'),
 (14, 1, 'Other Expense', 'expense');
+
+-- 10. Password Reset OTPs Table
+CREATE TABLE IF NOT EXISTS password_reset_otps (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(150) NOT NULL,
+  otp VARCHAR(10) NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_reset_email (email),
+  INDEX idx_reset_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

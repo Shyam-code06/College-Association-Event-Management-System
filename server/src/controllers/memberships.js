@@ -3,13 +3,25 @@ const { sendSuccess } = require('../utils/response');
 
 const membershipsController = {
   createPlan: async (req, res) => {
-    const plan = await membershipsService.createPlan(req.collegeId, req.body);
-    return sendSuccess(res, 201, 'Membership plan created successfully', plan);
+    const plan = await membershipsService.createPlan(req.collegeId, req.user, req.body);
+    const msg = req.user.role === 'organizer'
+      ? 'Membership plan submitted for College Admin approval'
+      : 'Membership plan created successfully';
+    return sendSuccess(res, 201, msg, plan);
   },
 
   listPlans: async (req, res) => {
-    const plans = await membershipsService.listPlans(req.collegeId);
+    const plans = await membershipsService.listPlans(req.collegeId, req.user);
     return sendSuccess(res, 200, 'Membership plans retrieved successfully', plans);
+  },
+
+  reviewPlanApproval: async (req, res) => {
+    const updated = await membershipsService.reviewPlanApproval(
+      req.params.id,
+      req.collegeId,
+      req.body.approval_status
+    );
+    return sendSuccess(res, 200, `Membership plan ${req.body.approval_status} successfully`, updated);
   },
 
   updatePlan: async (req, res) => {

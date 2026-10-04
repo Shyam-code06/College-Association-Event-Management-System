@@ -158,7 +158,7 @@ const processMockPayment = async (collegeId, paymentId, shouldSucceed = true) =>
               amount: payment.amount,
               source_type: TRANSACTION_SOURCE.PAYMENT,
               source_id: payment.id,
-              description: `Merchandise order #${order.id}`,
+              description: `Merchandise order ${order.id}`,
               transaction_date: today
             },
             trx

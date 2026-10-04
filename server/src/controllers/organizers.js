@@ -30,6 +30,11 @@ const organizersController = {
   softDelete: async (req, res) => {
     const result = await organizersService.softDeleteOrganizer(req.params.id, req.collegeId);
     return sendSuccess(res, 200, 'Organizer deleted successfully', result);
+  },
+
+  resetPassword: async (req, res) => {
+    const result = await organizersService.resetPassword(req.params.id, req.collegeId, req.body.newPassword);
+    return sendSuccess(res, 200, result.message, result);
   }
 };
 

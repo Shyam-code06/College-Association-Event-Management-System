@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import {
   ShieldCheck,
@@ -9,7 +9,11 @@ import {
   Filter,
   Sparkles,
   Layers,
-  GraduationCap
+  GraduationCap,
+  Search,
+  CheckSquare,
+  Square,
+  Users
 } from 'lucide-react';
 import { ResourceListPage } from '@/components/common/ResourceListPage';
 import { Badge } from '@/components/ui/Badge';
@@ -20,6 +24,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { useAuthStore } from '@/stores/auth';
 import { membershipsApi } from '@/api/memberships';
 import { usersApi } from '@/api/users';
 import { formatDate } from '@/utils/format';
@@ -34,6 +39,9 @@ const PRESET_ORGANIZATIONS = [
 ];
 
 export const Members = () => {
+  const { user } = useAuthStore();
+  const isOrganizer = user?.role === 'organizer';
+
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedOrgFilter, setSelectedOrgFilter] = useState('');
 
@@ -51,20 +59,55 @@ export const Members = () => {
   const [plans, setPlans] = useState([]);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
 
-  // Form states for Add Membership
-  const [selectedUserId, setSelectedUserId] = useState('');
-  const [selectedOrg, setSelectedOrg] = useState('Odoo Student Association');
+  // Form states for Add Membership (multi-student selection allowed)
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [selectedOrg, setSelectedOrg] = useState(
+    isOrganizer && user?.name?.toLowerCase().includes('csi')
+      ? 'CSI'
+      : isOrganizer && user?.name?.toLowerCase().includes('ieee')
+      ? 'IEEE Student Branch'
+      : 'Odoo Student Association'
+  );
   const [customOrg, setCustomOrg] = useState('');
   const [selectedPlanId, setSelectedPlanId] = useState('');
   const [durationMonths, setDurationMonths] = useState('12');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Filter students based on search query
+  const filteredStudents = useMemo(() => {
+    if (!studentSearch.trim()) return students;
+    const q = studentSearch.toLowerCase();
+    return students.filter(
+      (s) =>
+        s.name?.toLowerCase().includes(q) ||
+        s.email?.toLowerCase().includes(q) ||
+        s.enrollment_number?.toLowerCase().includes(q) ||
+        s.department?.toLowerCase().includes(q)
+    );
+  }, [students, studentSearch]);
+
+  const toggleStudent = (id) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllFiltered = () => {
+    const idsToAdd = filteredStudents.map((s) => s.id);
+    setSelectedUserIds((prev) => Array.from(new Set([...prev, ...idsToAdd])));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedUserIds([]);
+  };
 
   // Load students & plans when modal opens
   useEffect(() => {
     if (isAddModalOpen) {
       setIsLoadingOptions(true);
       Promise.all([
-        usersApi.listStudents({ limit: 100 }),
+        usersApi.listStudents({ limit: 200 }),
         membershipsApi.getPlans(),
       ])
         .then(([usersRes, plansRes]) => {
@@ -73,9 +116,6 @@ export const Members = () => {
           setStudents(studentList);
           setPlans(plansList);
 
-          if (studentList.length > 0 && !selectedUserId) {
-            setSelectedUserId(String(studentList[0].id));
-          }
           if (plansList.length > 0 && !selectedPlanId) {
             setSelectedPlanId(String(plansList[0].id));
           }
@@ -119,8 +159,12 @@ export const Members = () => {
 
   const handleAddMembership = async (e) => {
     e.preventDefault();
-    if (!selectedUserId || !selectedPlanId) {
-      toast.error('Please select both a student and a membership plan.');
+    if (selectedUserIds.length === 0) {
+      toast.error('Please select at least one student to grant membership.');
+      return;
+    }
+    if (!selectedPlanId) {
+      toast.error('Please select a membership tier / plan.');
       return;
     }
 
@@ -135,7 +179,7 @@ export const Members = () => {
     setIsSubmitting(true);
     try {
       await membershipsApi.adminCreate({
-        userId: Number(selectedUserId),
+        userIds: selectedUserIds.map(Number),
         planId: Number(selectedPlanId),
         organization: orgToSave,
         durationMonths: Number(durationMonths) || 12,
@@ -143,9 +187,12 @@ export const Members = () => {
         duesStatus: 'paid',
       });
 
-      toast.success(`Membership added successfully for ${orgToSave}!`);
+      toast.success(
+        `Membership successfully granted to ${selectedUserIds.length} student(s) for ${orgToSave}!`
+      );
       setIsAddModalOpen(false);
-      setSelectedUserId('');
+      setSelectedUserIds([]);
+      setStudentSearch('');
       setCustomOrg('');
       setRefreshKey((k) => k + 1);
     } catch (err) {
@@ -179,7 +226,7 @@ export const Members = () => {
     {
       key: 'id',
       header: 'Member ID',
-      render: (row) => <span className="font-mono font-semibold text-primary">#{row.id}</span>,
+      render: (row) => <span className="font-mono font-semibold text-primary">{row.id}</span>,
     },
     {
       key: 'student_name',
@@ -289,7 +336,10 @@ export const Members = () => {
         subtitle="Manage student association passes, organization affiliations, and gate privileges"
         breadcrumbs={[
           { label: 'Apps', href: '/apps' },
-          { label: 'Members', href: '/admin/members' },
+          {
+            label: 'Members',
+            href: isOrganizer ? '/organizer/members' : '/admin/members',
+          },
         ]}
         api={(params) =>
           membershipsApi.listMembers({
@@ -312,36 +362,100 @@ export const Members = () => {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         title="Add Student Membership"
-        maxWidth="max-w-lg"
+        maxWidth="max-w-xl"
       >
         <form onSubmit={handleAddMembership} className="space-y-4">
-          <p className="text-xs text-muted -mt-1 mb-3">
-            Assign a student to an association membership pass with verified privileges.
+          <p className="text-xs text-muted -mt-1 mb-2">
+            Select one or more students to grant membership passes with verified association privileges.
           </p>
 
-          {/* Student Selector */}
-          <FormField label="Select Student" required>
-            {isLoadingOptions ? (
-              <div className="text-xs text-muted py-2">Loading students...</div>
-            ) : students.length === 0 ? (
-              <div className="text-xs text-danger py-1">
-                No registered students found. Register students first.
+          {/* Student Multi-Selection */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-ink flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5 text-primary" />
+                Select Students <span className="text-danger">*</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-muted">
+                  {selectedUserIds.length} of {students.length} selected
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSelectAllFiltered}
+                  className="text-[11px] font-semibold text-primary hover:underline"
+                >
+                  Select All
+                </button>
+                <span className="text-muted text-[11px]">•</span>
+                <button
+                  type="button"
+                  onClick={handleClearSelection}
+                  className="text-[11px] font-semibold text-muted hover:text-ink hover:underline"
+                >
+                  Clear
+                </button>
               </div>
-            ) : (
-              <Select
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                required
-              >
-                <option value="">-- Choose Student --</option>
-                {students.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.email})
-                  </option>
-                ))}
-              </Select>
-            )}
-          </FormField>
+            </div>
+
+            {/* Search Input for filtering students */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted pointer-events-none" />
+              <input
+                type="text"
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                placeholder="Search students by name, email, or enrollment..."
+                className="w-full text-xs pl-8 pr-3 py-1.5 bg-canvas border border-line rounded-md text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+
+            {/* Scrollable checklist */}
+            <div className="border border-line rounded-md max-h-48 overflow-y-auto bg-surface divide-y divide-line/60">
+              {isLoadingOptions ? (
+                <div className="text-xs text-muted p-4 text-center">Loading students...</div>
+              ) : filteredStudents.length === 0 ? (
+                <div className="text-xs text-muted p-4 text-center">
+                  {students.length === 0 ? 'No registered students found' : 'No students match your search'}
+                </div>
+              ) : (
+                filteredStudents.map((s) => {
+                  const isChecked = selectedUserIds.includes(s.id);
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={() => toggleStudent(s.id)}
+                      className={`flex items-center justify-between px-3 py-2 text-xs cursor-pointer select-none transition-colors ${
+                        isChecked
+                          ? 'bg-primary-soft/40 hover:bg-primary-soft/60'
+                          : 'hover:bg-canvas'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {isChecked ? (
+                          <CheckSquare className="h-4 w-4 text-primary shrink-0" />
+                        ) : (
+                          <Square className="h-4 w-4 text-muted shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-semibold text-ink truncate">{s.name}</p>
+                          <p className="text-[11px] text-muted truncate">
+                            {s.email}
+                            {s.enrollment_number ? ` • ${s.enrollment_number}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      {s.department && (
+                        <span className="text-[10px] text-muted px-1.5 py-0.5 rounded bg-canvas border border-line shrink-0">
+                          {s.department}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
 
           {/* Organization Selection: "Which organization do you want to add membership for?" */}
           <FormField
@@ -409,7 +523,7 @@ export const Members = () => {
           <div className="p-3 bg-canvas border border-line rounded-md text-xs text-muted flex items-start gap-2">
             <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
             <span>
-              This will activate the student&apos;s membership pass immediately with paid dues and grant full association perks.
+              This will activate membership passes for all {selectedUserIds.length} selected student(s) immediately with paid dues and grant full association perks.
             </span>
           </div>
 
@@ -425,9 +539,10 @@ export const Members = () => {
               type="submit"
               variant="primary"
               isLoading={isSubmitting}
+              disabled={selectedUserIds.length === 0 || !selectedPlanId}
               icon={Plus}
             >
-              Add Membership
+              Add Membership ({selectedUserIds.length})
             </Button>
           </div>
         </form>

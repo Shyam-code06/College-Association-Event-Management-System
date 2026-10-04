@@ -3,19 +3,32 @@ const { applyTenantScope } = require('../utils/tenantScope');
 
 const emailLogModel = {
   create: async (collegeId, logData, trx = db) => {
-    const [id] = await trx('email_logs').insert({
+    const rawStatus = (logData.status || 'sent').toString().toLowerCase();
+    const status = rawStatus === 'failed' ? 'failed' : 'sent';
+    const insertPayload = {
       college_id: collegeId,
-      ...logData
-    });
+      recipient: logData.recipient,
+      subject: logData.subject,
+      status,
+      error: logData.error || null
+    };
+    const [id] = await trx('email_logs').insert(insertPayload);
     return trx('email_logs').where({ id, college_id: collegeId }).first();
   },
 
   createBatch: async (collegeId, logs, trx = db) => {
     if (!logs || logs.length === 0) return [];
-    const logsWithCollege = logs.map((log) => ({
-      college_id: collegeId,
-      ...log
-    }));
+    const logsWithCollege = logs.map((log) => {
+      const rawStatus = (log.status || 'sent').toString().toLowerCase();
+      const status = rawStatus === 'failed' ? 'failed' : 'sent';
+      return {
+        college_id: collegeId,
+        recipient: log.recipient,
+        subject: log.subject,
+        status,
+        error: log.error || null
+      };
+    });
     return trx('email_logs').insert(logsWithCollege);
   },
 

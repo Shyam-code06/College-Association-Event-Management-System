@@ -173,13 +173,20 @@ const collegeAdminsService = {
       email: a.email,
       role: a.role,
       isActive: Boolean(a.is_active),
+      is_active: Boolean(a.is_active),
       createdAt: a.created_at,
+      created_at: a.created_at,
       deletedAt: a.deleted_at,
+      deleted_at: a.deleted_at,
+      college_id: a.college_id,
+      college_name: a.college_name,
+      college_code: a.college_code,
       college: {
         id: a.college_id,
         name: a.college_name,
         code: a.college_code,
-        isActive: Boolean(a.college_is_active)
+        isActive: Boolean(a.college_is_active),
+        is_active: Boolean(a.college_is_active)
       }
     }));
 
@@ -208,13 +215,20 @@ const collegeAdminsService = {
       email: user.email,
       role: user.role,
       isActive: Boolean(user.is_active),
+      is_active: Boolean(user.is_active),
       createdAt: user.created_at,
+      created_at: user.created_at,
       deletedAt: user.deleted_at,
+      deleted_at: user.deleted_at,
+      college_id: user.college_id,
+      college_name: college?.name,
+      college_code: college?.code,
       college: college ? {
         id: college.id,
         name: college.name,
         code: college.code,
-        isActive: Boolean(college.is_active)
+        isActive: Boolean(college.is_active),
+        is_active: Boolean(college.is_active)
       } : null
     };
   },
@@ -249,10 +263,14 @@ const collegeAdminsService = {
         name: updatedAdmin.name,
         email: updatedAdmin.email,
         isActive: Boolean(updatedAdmin.is_active),
+        is_active: Boolean(updatedAdmin.is_active),
+        college_id: updatedCollege.id,
+        college_name: updatedCollege.name,
         college: {
           id: updatedCollege.id,
           name: updatedCollege.name,
-          isActive: Boolean(updatedCollege.is_active)
+          isActive: Boolean(updatedCollege.is_active),
+          is_active: Boolean(updatedCollege.is_active)
         }
       };
     });
@@ -287,6 +305,35 @@ const collegeAdminsService = {
         isDeleted: true
       };
     });
+  },
+
+  /**
+   * Resets a College Administrator's password (defaulting to '123456' if not specified).
+   *
+   * @param {number} id
+   * @param {string} [newPassword]
+   */
+  resetPassword: async (id, newPassword) => {
+    const admin = await userModel.findById(id, null);
+    if (!admin || admin.role !== ROLES.COLLEGE_ADMIN) {
+      throw new AppError('College administrator not found', 404);
+    }
+
+    const passwordToSet = (newPassword && newPassword.trim()) ? newPassword.trim() : '123456';
+    if (passwordToSet.length < 6) {
+      throw new AppError('Password must be at least 6 characters', 400);
+    }
+
+    const password_hash = await bcrypt.hash(passwordToSet, 10);
+    await userModel.update(id, { password_hash }, null);
+
+    return {
+      id: admin.id,
+      name: admin.name,
+      email: admin.email,
+      newPassword: passwordToSet,
+      message: `Password reset successfully for ${admin.name}. New password: ${passwordToSet}`
+    };
   }
 };
 

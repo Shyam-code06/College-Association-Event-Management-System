@@ -11,6 +11,7 @@ const iconButtonVariants = cva(
         outline: 'border border-line bg-surface text-ink hover:bg-canvas',
         primary: 'bg-primary text-surface hover:bg-primary-hover active:bg-primary-dark',
         soft: 'bg-primary-soft text-primary hover:bg-primary/20',
+        danger: 'text-danger hover:bg-danger/10 active:bg-danger/20',
       },
       size: {
         sm: 'h-7 w-7 p-1',
@@ -26,10 +27,10 @@ const iconButtonVariants = cva(
 );
 
 export const IconButton = React.forwardRef(
-  ({ className, variant, size, children, ...props }, ref) => {
+  ({ className, variant, size, icon: Icon, children, ...props }, ref) => {
     return (
       <button ref={ref} className={cn(iconButtonVariants({ variant, size }), className)} {...props}>
-        {children}
+        {Icon ? <Icon className="h-4 w-4" /> : children}
       </button>
     );
   }

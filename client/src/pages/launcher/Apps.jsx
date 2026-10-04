@@ -24,7 +24,7 @@ export const Apps = () => {
               Apps & Modules
             </h1>
             <span className="px-2 py-0.5 rounded-sm bg-primary-soft text-primary text-xs font-semibold">
-              {user?.collegeName || 'Skyline'}
+              {user?.collegeName || 'Odoo'}
             </span>
           </div>
           <p className="text-xs sm:text-sm text-muted mt-1">

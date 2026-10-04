@@ -30,6 +30,7 @@ export const AdminAnnouncements = () => {
     try {
       await announcementsApi.create({
         title,
+        message: content,
         content,
         priority,
       });
@@ -54,7 +55,7 @@ export const AdminAnnouncements = () => {
         <div>
           <span className="font-bold text-ink">{row.title}</span>
           <span className="block text-xs text-muted truncate max-w-sm">
-            {row.content}
+            {row.content || row.message}
           </span>
         </div>
       ),

@@ -1,12 +1,13 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { CheckCircle2, AlertCircle, Building2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Building2, KeyRound } from 'lucide-react';
 
 import { Wizard } from '@/components/ui/Wizard';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
+import { StudentForgotPasswordModal } from '@/components/auth/StudentForgotPasswordModal';
 import { createWizardStore } from '@/stores/wizard';
 import { useAuthStore } from '@/stores/auth';
 import { authApi } from '@/api/auth';
@@ -146,6 +147,20 @@ const AccountStep = ({ formData, updateFormData, errors }) => {
             onChange={(e) => updateFormData({ confirmPassword: e.target.value })}
           />
         </FormField>
+      </div>
+
+      <div className="flex items-center justify-between pt-1">
+        <span className="text-[11px] text-muted">Already have a student account?</span>
+        <button
+          type="button"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('open-student-forgot-password', { detail: { email: formData.email } }));
+          }}
+          className="text-[11px] font-semibold text-primary hover:underline inline-flex items-center gap-1"
+        >
+          <KeyRound className="h-3 w-3" />
+          Forgot Password?
+        </button>
       </div>
     </div>
   );
@@ -318,6 +333,20 @@ export const Register = () => {
     }
   };
 
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+
+  React.useEffect(() => {
+    const handleOpen = (e) => {
+      if (e.detail?.email) {
+        setForgotEmail(e.detail.email);
+      }
+      setIsForgotModalOpen(true);
+    };
+    window.addEventListener('open-student-forgot-password', handleOpen);
+    return () => window.removeEventListener('open-student-forgot-password', handleOpen);
+  }, []);
+
   return (
     <div className="py-12 max-w-xl mx-auto px-4">
       <Wizard
@@ -329,12 +358,31 @@ export const Register = () => {
         doneButtonText="Proceed to Sign In"
       />
 
-      <p className="text-center text-xs text-muted mt-4">
-        Already registered?{' '}
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 text-xs text-muted mt-5">
+        <span>Already registered?</span>
         <Link to="/login" className="font-semibold text-primary hover:underline">
           Sign In
         </Link>
-      </p>
+        <span className="hidden sm:inline text-line">•</span>
+        <button
+          type="button"
+          onClick={() => {
+            const currentEmail = registerStore.getState().formData.email || '';
+            setForgotEmail(currentEmail);
+            setIsForgotModalOpen(true);
+          }}
+          className="font-semibold text-primary hover:underline inline-flex items-center gap-1"
+        >
+          <KeyRound className="h-3.5 w-3.5" />
+          Forgot Password? (Student OTP Reset)
+        </button>
+      </div>
+
+      <StudentForgotPasswordModal
+        isOpen={isForgotModalOpen}
+        onClose={() => setIsForgotModalOpen(false)}
+        defaultEmail={forgotEmail}
+      />
     </div>
   );
 };

@@ -24,18 +24,24 @@ export const ExpenseReview = () => {
   };
 
   const handleReviewAction = async (status) => {
-    if (!reviewNote.trim()) {
-      toast.error('A review note is required to finalize approval or rejection.');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
+      const finalStatus = status.toLowerCase();
+      const defaultNote =
+        finalStatus === 'approved'
+          ? 'Approved by College Administrator'
+          : 'Rejected by College Administrator';
+      const noteToSend = reviewNote.trim() || defaultNote;
+
       await expensesApi.reviewExpense(selectedExpense.id, {
-        status,
-        review_note: reviewNote.trim(),
+        status: finalStatus,
+        review_note: noteToSend,
       });
-      toast.success(`Claim marked as ${status.toLowerCase()}!`);
+      toast.success(
+        `Claim #${selectedExpense.id} ${
+          finalStatus === 'approved' ? 'approved and posted to finance ledger!' : 'rejected.'
+        }`
+      );
       setSelectedExpense(null);
       setReviewNote('');
       setRefreshKey((k) => k + 1);
@@ -49,8 +55,8 @@ export const ExpenseReview = () => {
   const columns = [
     {
       key: 'id',
-      header: 'Claim #',
-      render: (row) => <span className="font-mono font-semibold">#{row.id}</span>,
+      header: 'Claim ID',
+      render: (row) => <span className="font-mono font-semibold">{row.id}</span>,
     },
     {
       key: 'submitter_name',
@@ -99,13 +105,27 @@ export const ExpenseReview = () => {
     },
   ];
 
-  const receiptUrl = selectedExpense?.receipt_url
-    ? selectedExpense.receipt_url.startsWith('http')
-      ? selectedExpense.receipt_url
-      : `http://localhost:5000${selectedExpense.receipt_url}`
-    : null;
+  const getReceiptUrl = (expense) => {
+    if (!expense) return null;
+    const rawPath = expense.receipt_url || expense.receipt_path;
+    if (!rawPath) return null;
+    if (rawPath.startsWith('http')) return rawPath;
+    const normalized = rawPath.replace(/\\/g, '/');
+    const uploadsIdx = normalized.indexOf('uploads/');
+    const relativePath =
+      uploadsIdx !== -1
+        ? '/' + normalized.substring(uploadsIdx)
+        : normalized.startsWith('/')
+        ? normalized
+        : '/' + normalized;
+    return `http://localhost:5000${relativePath}`;
+  };
 
-  const isLocked = selectedExpense && selectedExpense.status !== 'PENDING';
+  const receiptUrl = getReceiptUrl(selectedExpense);
+
+  const isLocked =
+    selectedExpense &&
+    ['approved', 'rejected'].includes(String(selectedExpense.status || '').toLowerCase());
 
   return (
     <>
@@ -135,7 +155,9 @@ export const ExpenseReview = () => {
             <div className="p-4 bg-canvas rounded-md border border-line space-y-2 text-xs">
               <div className="flex justify-between">
                 <span className="text-muted">Claimant:</span>
-                <span className="font-bold text-ink">{selectedExpense.student_name}</span>
+                <span className="font-bold text-ink">
+                  {selectedExpense.submitter_name || selectedExpense.student_name || 'Member'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted">Amount Claimed:</span>
@@ -155,26 +177,42 @@ export const ExpenseReview = () => {
 
             {/* Receipt Preview */}
             <div className="space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-muted">
-                Receipt Attachment
-              </span>
-              <div className="p-3 bg-canvas-2/50 border border-line rounded-md flex flex-col items-center justify-center min-h-[160px] max-h-72 overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">
+                  Receipt Attachment
+                </span>
+                {receiptUrl && (
+                  <a
+                    href={receiptUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-primary font-medium hover:underline inline-flex items-center gap-1"
+                  >
+                    <Eye className="h-3 w-3" /> Open in New Tab
+                  </a>
+                )}
+              </div>
+              <div className="p-3 bg-canvas-2/50 border border-line rounded-md flex flex-col items-center justify-center min-h-[160px] max-h-80 overflow-hidden">
                 {receiptUrl ? (
-                  receiptUrl.endsWith('.pdf') ? (
+                  receiptUrl.toLowerCase().endsWith('.pdf') ? (
                     <a
                       href={receiptUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-2 text-primary font-semibold text-xs hover:underline"
+                      className="inline-flex items-center gap-2 text-primary font-semibold text-xs hover:underline p-3 bg-surface border border-line rounded"
                     >
                       <FileText className="h-5 w-5" /> View Uploaded PDF Document
                     </a>
                   ) : (
-                    <img
-                      src={receiptUrl}
-                      alt="Receipt Attachment"
-                      className="max-h-64 object-contain rounded"
-                    />
+                    <div className="flex flex-col items-center gap-2">
+                      <img
+                        src={receiptUrl}
+                        alt="Receipt Attachment"
+                        className="max-h-64 object-contain rounded border border-line/60 shadow-sm cursor-pointer hover:opacity-95 transition-opacity"
+                        onClick={() => window.open(receiptUrl, '_blank')}
+                        title="Click to view full size"
+                      />
+                    </div>
                   )
                 ) : (
                   <span className="text-xs text-muted">No receipt file attached</span>
@@ -189,7 +227,7 @@ export const ExpenseReview = () => {
                   <Lock className="h-4 w-4 text-muted" />
                   <span>
                     Audited status:{' '}
-                    <strong className="text-ink">{selectedExpense.status}</strong>
+                    <strong className="text-ink capitalize">{selectedExpense.status}</strong>
                   </span>
                 </div>
                 <span className="text-muted italic">
@@ -200,8 +238,7 @@ export const ExpenseReview = () => {
               <div className="space-y-4 pt-2">
                 <FormField
                   label="Auditor / Review Note"
-                  required
-                  hint="Provide reason for approval or rejection (visible to student)"
+                  hint="Provide remarks for approval or rejection (visible to submitter)"
                 >
                   <Textarea
                     rows={2}
@@ -238,5 +275,6 @@ export const ExpenseReview = () => {
     </>
   );
 };
+
 
 export default ExpenseReview;

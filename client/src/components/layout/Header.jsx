@@ -52,10 +52,10 @@ export const Header = () => {
           </div>
           <div className="flex flex-col">
             <span className="text-base font-bold text-ink tracking-tight leading-tight">
-              Skyline
+              Odoo
             </span>
             <span className="text-[10px] uppercase font-bold tracking-wider text-muted">
-              Student Association
+              Student Organization
             </span>
           </div>
         </Link>

@@ -10,7 +10,8 @@ const {
   createOrganizerSchema,
   updateOrganizerSchema,
   toggleOrganizerAccessSchema,
-  listOrganizersSchema
+  listOrganizersSchema,
+  resetOrganizerPasswordSchema
 } = require('../validations/organizers');
 
 const router = express.Router();
@@ -50,6 +51,12 @@ router.patch(
   '/:id/access',
   validate(toggleOrganizerAccessSchema),
   asyncHandler(organizersController.toggleAccess)
+);
+
+router.post(
+  '/:id/reset-password',
+  validate(resetOrganizerPasswordSchema),
+  asyncHandler(organizersController.resetPassword)
 );
 
 router.delete(

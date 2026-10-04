@@ -69,7 +69,7 @@ Demo chips on the `/login` page autofill the following credentials in developmen
 
 | Role | Email | Password | Scope |
 | :--- | :--- | :--- | :--- |
-| **Super Admin** | `superadmin@skyline.edu` | `SuperAdmin@123` | College Admins provisioning only |
+| **Super Admin** | `superadmin@odoo.com` | `123456` | College Admins provisioning only |
 | **College Admin** | `collegeadmin@skyline.edu` | `CollegeAdmin@123` | College Association overview & apps |
 | **Organizer** | `organizer@skyline.edu` | `Organizer@123` | Event creation & gate scanner |
 | **Student** | `aarav@skyline.edu` | `Student@123` | Tickets, membership & merch |

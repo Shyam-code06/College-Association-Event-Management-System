@@ -14,7 +14,7 @@ export const Footer = () => {
                 <Sparkles className="h-5 w-5" />
               </div>
               <span className="text-lg font-bold tracking-tight text-surface">
-                Skyline Associations
+                Odoo Student Organization
               </span>
             </div>
             <p className="text-sm text-canvas-2/70 max-w-sm leading-relaxed mb-4">
@@ -75,7 +75,7 @@ export const Footer = () => {
         </div>
 
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-canvas-2/50">
-          <p>© {new Date().getFullYear()} Skyline Student Association. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Odoo Student Organization. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <span>Privacy Policy</span>
             <span>Terms of Service</span>

@@ -197,7 +197,7 @@ export const Home = () => {
             <div>
               <h2 className="text-2xl sm:text-3xl font-bold">Ready to modernize your association?</h2>
               <p className="text-sm text-primary-soft/90 mt-2 max-w-lg">
-                Join collegiate clubs already running seamless workshops, fests, and ticketing on Skyline.
+                Join collegiate clubs already running seamless workshops, fests, and ticketing on Odoo Student Organization.
               </p>
             </div>
             <Button

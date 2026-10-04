@@ -1,8 +1,10 @@
+const db = require('../config/database');
 const fundraiserModel = require('../models/fundraiser');
 const userModel = require('../models/user');
 const membershipModel = require('../models/membership');
 const emailLogModel = require('../models/emailLog');
 const announcementModel = require('../models/announcement');
+const { sendMail } = require('./email');
 const { ROLES } = require('../constants/roles');
 const AppError = require('../utils/appError');
 const { getPaginationParams, buildPaginationMeta } = require('../utils/pagination');
@@ -83,6 +85,17 @@ const fundraisersService = {
   },
 
   /**
+   * Retrieves tasks for a specific fundraiser.
+   */
+  getTasksByFundraiser: async (fundraiserId, collegeId) => {
+    const fundraiser = await fundraiserModel.findFundraiserById(fundraiserId, collegeId);
+    if (!fundraiser) {
+      throw new AppError('Volunteer project not found', 404);
+    }
+    return fundraiserModel.findTasksByFundraiser(fundraiserId, collegeId);
+  },
+
+  /**
    * Updates fundraiser details or status.
    */
   updateFundraiser: async (id, collegeId, updateData) => {
@@ -158,33 +171,65 @@ const fundraisersService = {
       invitation_status: 'pending'
     });
 
-    // 1. Notify student via Email Log
+    // 1. Dispatch actual email notification & record in email log
     try {
+      const emailSubject = `Volunteer Invitation: ${title} (${fundraiser.organization || 'Odoo Student Association'})`;
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <h2 style="color: #4f46e5; margin-top: 0;">Volunteer Invitation</h2>
+          <p>Hello <strong>${assignee.name}</strong>,</p>
+          <p>You have been invited to volunteer for <strong>${fundraiser.title}</strong> by ${
+            fundraiser.organization || 'Odoo Student Association'
+          }.</p>
+          <div style="background-color: #f8fafc; padding: 16px; border-left: 4px solid #4f46e5; margin: 16px 0; border-radius: 4px;">
+            <p style="margin: 0 0 8px 0;"><strong>Role & Duties:</strong> ${title}</p>
+            <p style="margin: 0 0 8px 0;"><strong>Instructions:</strong> ${
+              description || 'Please follow instructions provided by your organizer.'
+            }</p>
+            <p style="margin: 0;"><strong>Invitation Response Deadline:</strong> ${
+              invDeadline || 'Immediate'
+            }</p>
+          </div>
+          <p>Please sign in to your student dashboard to review and accept your volunteer invitation.</p>
+          <p style="margin-top: 24px; color: #64748b; font-size: 14px;">Best regards,<br/>${
+            fundraiser.organization || 'Odoo Student Association'
+          }</p>
+        </div>
+      `;
+      const emailText = `Hello ${assignee.name},\n\nYou have been invited to volunteer for "${fundraiser.title}" by ${
+        fundraiser.organization || 'Odoo Student Association'
+      }.\n\nRole & Duties: ${title}\nInstructions: ${
+        description || 'Please follow instructions provided by your organizer.'
+      }\nInvitation Response Deadline: ${
+        invDeadline || 'Immediate'
+      }\n\nPlease sign in to your student dashboard to review and accept your volunteer invitation.\n\nBest regards,\nOdoo Student Association`;
+
+      const mailResult = await sendMail({
+        to: `"${assignee.name}" <${assignee.email}>`,
+        subject: emailSubject,
+        html: emailHtml,
+        text: emailText
+      });
+
       await emailLogModel.create(collegeId, {
         recipient: assignee.email,
-        subject: `Volunteer Invitation: ${title} (${fundraiser.organization || 'Odoo Student Association'})`,
-        body: `Hello ${assignee.name},\n\nYou have been invited to volunteer for "${fundraiser.title}" by ${
-          fundraiser.organization || 'Odoo Student Association'
-        }.\n\nRole & Duties: ${title}\nInstructions: ${
-          description || 'Please follow instructions provided by your organizer.'
-        }\nInvitation Response Deadline: ${
-          invDeadline || 'Immediate'
-        }\n\nPlease sign in to your student dashboard to review and accept your volunteer invitation.\n\nBest regards,\nOdoo Student Association`,
-        status: 'SENT'
+        subject: emailSubject,
+        status: mailResult.success ? 'sent' : 'failed',
+        error: mailResult.error || null
       });
     } catch (err) {
-      console.warn('Failed to record volunteer task email log', err?.message);
+      console.warn('Failed to dispatch or record volunteer task email', err?.message);
     }
 
     // 2. Broadcast Announcement for the student
     try {
       await announcementModel.create(collegeId, {
         title: `Volunteer Invitation: ${title}`,
-        content: `Active member ${assignee.name} has been invited as volunteer for "${fundraiser.title}". Response deadline: ${
+        message: `Active member ${assignee.name} has been invited as volunteer for "${fundraiser.title}". Response deadline: ${
           invDeadline || 'Open'
         }.`,
-        target_audience: 'STUDENTS',
-        created_by: fundraiser.created_by
+        posted_by: fundraiser.created_by,
+        priority: 'INFO'
       });
     } catch (err) {
       console.warn('Failed to create volunteer task announcement', err?.message);
@@ -244,6 +289,14 @@ const fundraisersService = {
 
     if (user.role === ROLES.STUDENT && task.assignee_id !== user.id) {
       throw new AppError('You are only authorized to update your own assigned tasks', 403);
+    }
+
+    // Only allow status updates (including completed) after the student accepts the invitation
+    if (task.invitation_status !== 'accepted') {
+      throw new AppError(
+        `Task status cannot be changed to "${status}" until the student accepts the volunteer invitation (Current status: ${task.invitation_status || 'pending'}).`,
+        400
+      );
     }
 
     return fundraiserModel.updateTask(taskId, collegeId, { status });

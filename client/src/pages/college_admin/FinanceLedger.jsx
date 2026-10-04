@@ -18,10 +18,11 @@ import { useAuthStore } from '@/stores/auth';
 import { formatCurrency, formatDateTime } from '@/utils/format';
 
 export const FinanceLedger = () => {
-  const { user } = useAuthStore();
-  const printAreaRef = useRef(null);
+  const reportPrintRef = useRef(null);
+  const user = useAuthStore((state) => state.user);
   const [summary, setSummary] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -32,6 +33,18 @@ export const FinanceLedger = () => {
   const [categoryId, setCategoryId] = useState('');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleTypeChange = (newType) => {
+    setType(newType);
+    const matching = categories.filter(
+      (c) => String(c.type || '').toLowerCase() === String(newType).toLowerCase()
+    );
+    if (matching.length > 0) {
+      setCategoryId(String(matching[0].id));
+    } else {
+      setCategoryId('');
+    }
+  };
 
   useEffect(() => {
     Promise.allSettled([
@@ -44,12 +57,24 @@ export const FinanceLedger = () => {
       if (catRes.status === 'fulfilled') {
         const catList = catRes.value?.data || [];
         setCategories(catList);
-        if (catList.length > 0 && !categoryId) {
+        const matching = catList.filter(
+          (c) => String(c.type || '').toLowerCase() === String(type).toLowerCase()
+        );
+        if (matching.length > 0) {
+          setCategoryId(String(matching[0].id));
+        } else if (catList.length > 0) {
           setCategoryId(String(catList[0].id));
         }
       }
     });
   }, [refreshKey]);
+
+  const fetchTransactions = async (params) => {
+    const res = await financeApi.getTransactions(params);
+    const items = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+    setTransactions(items);
+    return res;
+  };
 
   const handleManualEntry = async (e) => {
     e.preventDefault();
@@ -58,15 +83,20 @@ export const FinanceLedger = () => {
       return;
     }
 
+    if (!categoryId) {
+      toast.error('Please select a category for this transaction.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await financeApi.createManualEntry({
-        type,
+        type: type.toLowerCase(),
         amount: Number(amount),
-        category_id: categoryId ? Number(categoryId) : undefined,
-        description,
+        category_id: Number(categoryId),
+        description: description.trim(),
       });
-      toast.success('Transaction entry recorded!');
+      toast.success('Transaction entry recorded successfully!');
       setIsModalOpen(false);
       setAmount('');
       setDescription('');
@@ -80,184 +110,53 @@ export const FinanceLedger = () => {
 
   const handleDownloadPdf = async () => {
     setIsExporting(true);
-    const toastId = toast.loading('Generating Finance Ledger PDF report...');
+    const toastId = toast.loading('Preparing audited Finance Ledger PDF...');
 
     try {
-      const txRes = await financeApi.getTransactions({ limit: 100 });
-      const txList = txRes.data || [];
+      // Ensure we have current transactions list
+      let txList = transactions;
+      if (!txList || txList.length === 0) {
+        const res = await financeApi.getTransactions({ limit: 100 });
+        txList = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        setTransactions(txList);
+      }
 
+      // Small delay to ensure any DOM updates / canvas fonts are fully rendered
+      await new Promise((r) => setTimeout(r, 250));
+
+      const element = reportPrintRef.current;
+      if (!element) {
+        throw new Error('Print report template not found');
+      }
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#FFFFFF',
+      });
+
+      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pageHeight = pdf.internal.pageSize.getHeight();
 
-      // Brand Header
-      pdf.setFillColor(113, 75, 103); // #714B67 primary purple
-      pdf.rect(0, 0, pageWidth, 28, 'F');
+      let heightLeft = pdfHeight;
+      let position = 0;
 
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(18);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Odoo Student Organization - Finance Ledger', 14, 14);
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pageHeight;
 
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(
-        `College Campus: ${user?.collegeName || 'Gcet'} | Date: ${new Date().toLocaleDateString('en-GB')}`,
-        14,
-        22
-      );
-
-      // Financial Summary Box
-      pdf.setTextColor(33, 37, 41);
-      pdf.setFontSize(13);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Audited Ledger Summary', 14, 38);
-
-      const incomeVal = summary?.total_income || 0;
-      const expenseVal = summary?.total_expense || 0;
-      const balanceVal = summary?.balance || 0;
-
-      pdf.setDrawColor(222, 226, 230);
-      pdf.setFillColor(248, 249, 250);
-      pdf.roundedRect(14, 42, pageWidth - 28, 22, 3, 3, 'FD');
-
-      pdf.setFontSize(9);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(108, 117, 125);
-      pdf.text('TOTAL INCOME', 20, 49);
-      pdf.text('TOTAL EXPENSES', 80, 49);
-      pdf.text('CURRENT NET RESERVE', 140, 49);
-
-      pdf.setFontSize(13);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(16, 185, 129); // green
-      pdf.text(`+ ₹${Number(incomeVal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 20, 58);
-
-      pdf.setTextColor(239, 68, 68); // red
-      pdf.text(`- ₹${Number(expenseVal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 80, 58);
-
-      pdf.setTextColor(113, 75, 103); // purple
-      pdf.text(`₹${Number(balanceVal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 140, 58);
-
-      let currentY = 74;
-
-      // Capture Chart if available
-      if (printAreaRef.current) {
-        try {
-          const chartElement = printAreaRef.current.querySelector('.recharts-responsive-container');
-          if (chartElement) {
-            const canvas = await html2canvas(chartElement, {
-              scale: 2,
-              useCORS: true,
-              logging: false,
-              backgroundColor: '#FFFFFF',
-            });
-            const imgData = canvas.toDataURL('image/png');
-            pdf.setFontSize(12);
-            pdf.setTextColor(33, 37, 41);
-            pdf.setFont('helvetica', 'bold');
-            pdf.text('Category Breakdown Chart', 14, currentY);
-            currentY += 4;
-            pdf.addImage(imgData, 'PNG', 14, currentY, 182, 50);
-            currentY += 56;
-          }
-        } catch (chartErr) {
-          console.warn('Could not render chart in PDF', chartErr);
-        }
+      while (heightLeft > 0) {
+        position = heightLeft - pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+        heightLeft -= pageHeight;
       }
 
-      // Transactions Ledger Table
-      pdf.setFontSize(12);
-      pdf.setTextColor(33, 37, 41);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(`Recorded Journal Entries (${txList.length})`, 14, currentY);
-      currentY += 6;
-
-      // Table Header
-      pdf.setFillColor(241, 243, 245);
-      pdf.rect(14, currentY, pageWidth - 28, 8, 'F');
-      pdf.setFontSize(8);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(73, 80, 87);
-      pdf.text('ID', 17, currentY + 5);
-      pdf.text('DESCRIPTION / CATEGORY', 30, currentY + 5);
-      pdf.text('FLOW TYPE', 105, currentY + 5);
-      pdf.text('AMOUNT', 135, currentY + 5);
-      pdf.text('DATE RECORDED', 165, currentY + 5);
-      currentY += 8;
-
-      // Table Rows
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(8);
-
-      for (let i = 0; i < txList.length; i++) {
-        const row = txList[i];
-        if (currentY > 275) {
-          pdf.addPage();
-          currentY = 20;
-          // Re-draw table header on new page
-          pdf.setFillColor(241, 243, 245);
-          pdf.rect(14, currentY, pageWidth - 28, 8, 'F');
-          pdf.setFontSize(8);
-          pdf.setFont('helvetica', 'bold');
-          pdf.setTextColor(73, 80, 87);
-          pdf.text('ID', 17, currentY + 5);
-          pdf.text('DESCRIPTION / CATEGORY', 30, currentY + 5);
-          pdf.text('FLOW TYPE', 105, currentY + 5);
-          pdf.text('AMOUNT', 135, currentY + 5);
-          pdf.text('DATE RECORDED', 165, currentY + 5);
-          currentY += 8;
-          pdf.setFont('helvetica', 'normal');
-          pdf.setFontSize(8);
-        }
-
-        const isInc = String(row.type).toUpperCase() === 'INCOME';
-        const amtStr = `${isInc ? '+' : '-'} ₹${Number(row.amount || 0).toLocaleString('en-IN', {
-          minimumFractionDigits: 2,
-        })}`;
-
-        // Alternating row background
-        if (i % 2 === 1) {
-          pdf.setFillColor(248, 249, 250);
-          pdf.rect(14, currentY, pageWidth - 28, 8, 'F');
-        }
-
-        pdf.setTextColor(33, 37, 41);
-        pdf.text(`#${row.id}`, 17, currentY + 5);
-
-        // Truncate long descriptions
-        const desc = row.description
-          ? row.description.length > 38
-            ? row.description.substring(0, 36) + '...'
-            : row.description
-          : '-';
-        pdf.text(desc, 30, currentY + 5);
-
-        // Flow type
-        if (isInc) {
-          pdf.setTextColor(16, 185, 129);
-          pdf.text('Income', 105, currentY + 5);
-        } else {
-          pdf.setTextColor(239, 68, 68);
-          pdf.text('Expense', 105, currentY + 5);
-        }
-
-        // Amount
-        if (isInc) {
-          pdf.setTextColor(16, 185, 129);
-        } else {
-          pdf.setTextColor(239, 68, 68);
-        }
-        pdf.text(amtStr, 135, currentY + 5);
-
-        // Date
-        pdf.setTextColor(108, 117, 125);
-        const dateStr = row.created_at ? formatDateTime(row.created_at) : '-';
-        pdf.text(dateStr, 165, currentY + 5);
-
-        currentY += 8;
-      }
-
-      pdf.save(`Odoo-Finance-Ledger-${new Date().toISOString().split('T')[0]}.pdf`);
+      const collegeSlug = (user?.college_name || 'GCET').toLowerCase().replace(/\s+/g, '-');
+      pdf.save(`Finance-Ledger-${collegeSlug}-${new Date().toISOString().split('T')[0]}.pdf`);
       toast.success('Finance Ledger PDF downloaded successfully!', { id: toastId });
     } catch (err) {
       console.error('PDF export failed:', err);
@@ -280,16 +179,16 @@ export const FinanceLedger = () => {
 
   const columns = [
     {
-      key: 'id',
-      header: 'ID',
-      render: (row) => <span className="font-mono font-semibold">#{row.id}</span>,
+      key: 'sr_no',
+      header: 'SR. NO.',
+      render: (_row, index) => <span className="font-semibold text-muted">{index + 1}</span>,
     },
     {
       key: 'description',
       header: 'Description',
       render: (row) => (
         <div>
-          <span className="font-bold text-ink">{row.description}</span>
+          <span className="font-bold text-ink">{String(row.description || '').replace(/#(\d+)/g, '$1')}</span>
           {row.category_name && (
             <span className="block text-xs text-muted">{row.category_name}</span>
           )}
@@ -329,7 +228,7 @@ export const FinanceLedger = () => {
     {
       key: 'created_at',
       header: 'Date Recorded',
-      render: (row) => formatDateTime(row.created_at),
+      render: (row) => formatDateTime(row.created_at || row.transaction_date),
     },
   ];
 
@@ -343,7 +242,7 @@ export const FinanceLedger = () => {
           { label: 'Apps', href: '/apps' },
           { label: 'Finance', href: '/admin/finance' },
         ]}
-        api={financeApi.getTransactions}
+        api={fetchTransactions}
         columns={columns}
         actionLabel="Manual Journal Entry"
         onAction={() => setIsModalOpen(true)}
@@ -361,7 +260,7 @@ export const FinanceLedger = () => {
         }
         searchPlaceholder="Search transactions..."
         headerChildren={
-          <div ref={printAreaRef} className="space-y-6">
+          <div className="space-y-6">
             {/* StatCards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <StatCard
@@ -420,6 +319,356 @@ export const FinanceLedger = () => {
         }
       />
 
+      {/* Hidden print container for high-resolution PDF generation */}
+      <div
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          top: 0,
+          width: '800px',
+          backgroundColor: '#FFFFFF',
+          opacity: 1,
+          pointerEvents: 'none',
+        }}
+        aria-hidden="true"
+      >
+        <div
+          ref={reportPrintRef}
+          style={{
+            width: '800px',
+            backgroundColor: '#FFFFFF',
+            color: '#1F2937',
+            fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            boxSizing: 'border-box',
+          }}
+        >
+          {/* Header Banner */}
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #714B67 0%, #54374D 100%)',
+              padding: '24px 32px',
+              color: '#FFFFFF',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: '#E4D5E0',
+                    marginBottom: '4px',
+                  }}
+                >
+                  Odoo Student Organization
+                </span>
+                <h1
+                  style={{
+                    fontSize: '24px',
+                    fontWeight: 800,
+                    margin: 0,
+                    color: '#FFFFFF',
+                    letterSpacing: '-0.02em',
+                  }}
+                >
+                  Finance Ledger & Audit Report
+                </h1>
+                <div
+                  style={{
+                    marginTop: '8px',
+                    fontSize: '13px',
+                    color: '#F3E8EE',
+                    display: 'flex',
+                    gap: '16px',
+                  }}
+                >
+                  <span>College Campus: <strong>{user?.college_name || 'GCET'}</strong></span>
+                  <span>•</span>
+                  <span>Date: <strong>{new Date().toLocaleDateString('en-GB')}</strong></span>
+                  <span>•</span>
+                  <span>Status: <strong style={{ color: '#6EE7B7' }}>Audited & Balanced</strong></span>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  borderRadius: '100px',
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#FFFFFF',
+                  textAlign: 'right',
+                }}
+              >
+                Official Ledger
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding: '28px 32px' }}>
+            {/* Audited Ledger Summary */}
+            <h2
+              style={{
+                fontSize: '16px',
+                fontWeight: 700,
+                color: '#111827',
+                marginBottom: '14px',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Audited Ledger Summary
+            </h2>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '14px',
+                marginBottom: '28px',
+              }}
+            >
+              {/* Income */}
+              <div
+                style={{
+                  border: '1px solid #D1FAE5',
+                  backgroundColor: '#F0FDF4',
+                  borderRadius: '10px',
+                  padding: '16px',
+                }}
+              >
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#047857', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  Total Income
+                </div>
+                <div style={{ fontSize: '22px', fontWeight: 800, color: '#059669', marginBottom: '4px' }}>
+                  + {formatCurrency(summary?.total_income || 0)}
+                </div>
+                <div style={{ fontSize: '11px', color: '#065F46' }}>
+                  Memberships, tickets & sales
+                </div>
+              </div>
+
+              {/* Expense */}
+              <div
+                style={{
+                  border: '1px solid #FEE2E2',
+                  backgroundColor: '#FEF2F2',
+                  borderRadius: '10px',
+                  padding: '16px',
+                }}
+              >
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#B91C1C', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  Total Expenses
+                </div>
+                <div style={{ fontSize: '22px', fontWeight: 800, color: '#DC2626', marginBottom: '4px' }}>
+                  - {formatCurrency(summary?.total_expense || 0)}
+                </div>
+                <div style={{ fontSize: '11px', color: '#991B1B' }}>
+                  Reimbursements & costs
+                </div>
+              </div>
+
+              {/* Net Reserve */}
+              <div
+                style={{
+                  border: '1px solid #E9D5E5',
+                  backgroundColor: '#FAF5F9',
+                  borderRadius: '10px',
+                  padding: '16px',
+                }}
+              >
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#714B67', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  Current Net Reserve
+                </div>
+                <div style={{ fontSize: '22px', fontWeight: 800, color: '#714B67', marginBottom: '4px' }}>
+                  {formatCurrency(summary?.balance || 0)}
+                </div>
+                <div style={{ fontSize: '11px', color: '#54374D' }}>
+                  Audited reserve balance
+                </div>
+              </div>
+            </div>
+
+            {/* Category Breakdown */}
+            {chartData && chartData.length > 0 && (
+              <div style={{ marginBottom: '28px' }}>
+                <h2
+                  style={{
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    color: '#111827',
+                    marginBottom: '12px',
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  Category Breakdown
+                </h2>
+                <div
+                  style={{
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '10px',
+                    padding: '16px 20px',
+                    backgroundColor: '#FAFAFA',
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {chartData.map((cat, idx) => {
+                      const maxVal = Math.max(...chartData.map((c) => c.amount), 1);
+                      const pct = Math.min(100, Math.round((cat.amount / maxVal) * 100));
+                      return (
+                        <div key={idx}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>
+                            <span style={{ color: '#374151' }}>{cat.name}</span>
+                            <span style={{ color: cat.color, fontWeight: 700 }}>{formatCurrency(cat.amount)}</span>
+                          </div>
+                          <div style={{ width: '100%', height: '8px', backgroundColor: '#E5E7EB', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div
+                              style={{
+                                width: `${pct}%`,
+                                height: '100%',
+                                backgroundColor: cat.color || '#10B981',
+                                borderRadius: '4px',
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Recorded Journal Entries */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h2
+                  style={{
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    color: '#111827',
+                    margin: 0,
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  Recorded Journal Entries ({transactions.length})
+                </h2>
+                <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: 500 }}>
+                  Sequential Ledger Records (No Internal IDs)
+                </span>
+              </div>
+
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  fontSize: '12px',
+                }}
+              >
+                <thead>
+                  <tr style={{ backgroundColor: '#F3F4F6', borderBottom: '1px solid #E5E7EB', textAlign: 'left' }}>
+                    <th style={{ padding: '10px 12px', fontWeight: 700, color: '#4B5563', width: '70px' }}>SR. NO.</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 700, color: '#4B5563' }}>DESCRIPTION / CATEGORY</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 700, color: '#4B5563', width: '90px' }}>FLOW TYPE</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 700, color: '#4B5563', width: '120px', textAlign: 'right' }}>AMOUNT</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 700, color: '#4B5563', width: '150px' }}>DATE RECORDED</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: '#9CA3AF' }}>
+                        No transactions recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    transactions.map((tx, idx) => {
+                      const isIncome = String(tx.type).toUpperCase() === 'INCOME';
+                      return (
+                        <tr
+                          key={tx.id || idx}
+                          style={{
+                            borderBottom: '1px solid #F3F4F6',
+                            backgroundColor: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA',
+                          }}
+                        >
+                          <td style={{ padding: '10px 12px', fontWeight: 700, color: '#6B7280' }}>
+                            {idx + 1}
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <div style={{ fontWeight: 700, color: '#111827' }}>
+                              {String(tx.description || '').replace(/#(\d+)/g, '$1')}
+                            </div>
+                            {tx.category_name && (
+                              <div style={{ fontSize: '11px', color: '#6B7280' }}>{tx.category_name}</div>
+                            )}
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                padding: '3px 8px',
+                                borderRadius: '12px',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.04em',
+                                backgroundColor: isIncome ? '#DEF7EC' : '#FDE8E8',
+                                color: isIncome ? '#03543F' : '#9B1C1C',
+                                border: `1px solid ${isIncome ? '#BCF0DA' : '#FBD5D5'}`,
+                              }}
+                            >
+                              {isIncome ? 'Income' : 'Expense'}
+                            </span>
+                          </td>
+                          <td
+                            style={{
+                              padding: '10px 12px',
+                              textAlign: 'right',
+                              fontWeight: 800,
+                              fontSize: '13px',
+                              color: isIncome ? '#059669' : '#DC2626',
+                            }}
+                          >
+                            {isIncome ? '+' : '-'} {formatCurrency(tx.amount)}
+                          </td>
+                          <td style={{ padding: '10px 12px', color: '#4B5563', fontSize: '11px' }}>
+                            {formatDateTime(tx.created_at || tx.transaction_date)}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                marginTop: '32px',
+                paddingTop: '16px',
+                borderTop: '1px solid #E5E7EB',
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '11px',
+                color: '#9CA3AF',
+              }}
+            >
+              <span>Generated by Odoo Student Organization ERP System</span>
+              <span>Audited Campus Ledger • Confidential Record</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Manual Entry Modal */}
       <Modal
         isOpen={isModalOpen}
@@ -428,7 +677,7 @@ export const FinanceLedger = () => {
       >
         <form onSubmit={handleManualEntry} className="space-y-4">
           <FormField label="Entry Type" required>
-            <Select value={type} onChange={(e) => setType(e.target.value)}>
+            <Select value={type} onChange={(e) => handleTypeChange(e.target.value)}>
               <option value="INCOME">Income / Deposit</option>
               <option value="EXPENSE">Expense / Disbursement</option>
             </Select>
@@ -437,6 +686,8 @@ export const FinanceLedger = () => {
           <FormField label="Amount (INR ₹)" required>
             <Input
               type="number"
+              step="0.01"
+              min="0.01"
               placeholder="e.g. 2500"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
@@ -444,16 +695,19 @@ export const FinanceLedger = () => {
             />
           </FormField>
 
-          <FormField label="Category">
+          <FormField label="Category" required>
             <Select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
+              required
             >
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
+              {categories
+                .filter((c) => String(c.type || '').toLowerCase() === String(type).toLowerCase())
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
             </Select>
           </FormField>
 
@@ -462,6 +716,7 @@ export const FinanceLedger = () => {
               placeholder="e.g. Donation from alumni association"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              minLength={3}
               required
             />
           </FormField>

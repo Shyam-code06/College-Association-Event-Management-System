@@ -19,6 +19,15 @@ const ticketsController = {
     );
     const statusCode = result.success ? 200 : 400;
     return res.status(statusCode).json(result);
+  },
+
+  deleteAttendance: async (req, res) => {
+    const result = await ticketsService.deleteAttendance(
+      req.collegeId,
+      req.user.id,
+      req.body
+    );
+    return sendSuccess(res, 200, `Attendance deleted for ${result.attendeeName}`, result);
   }
 };
 

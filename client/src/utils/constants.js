@@ -8,8 +8,8 @@ export const ROLES = Object.freeze({
 export const DEMO_CREDENTIALS = [
   {
     role: 'Super Admin',
-    email: 'superadmin@skyline.edu',
-    password: 'SuperAdmin@123',
+    email: 'superadmin@odoo.com',
+    password: '123456',
     badge: 'bg-primary-soft text-primary',
   },
   {

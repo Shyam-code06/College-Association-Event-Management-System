@@ -514,16 +514,41 @@ export const AdminFundraisers = () => {
                     </div>
 
                     <div className="shrink-0 flex items-center gap-2">
-                      <span className="text-[11px] text-muted font-medium">Status:</span>
-                      <Select
-                        value={t.status || 'pending'}
-                        onChange={(e) => handleUpdateTaskStatus(t.id, e.target.value)}
-                        className="h-8 text-xs w-32"
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                      </Select>
+                      {t.invitation_status === 'accepted' ? (
+                        <>
+                          <span className="text-[11px] text-muted font-medium">Status:</span>
+                          <Select
+                            value={t.status || 'pending'}
+                            onChange={(e) => handleUpdateTaskStatus(t.id, e.target.value)}
+                            className="h-8 text-xs w-32"
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                          </Select>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                              t.invitation_status === 'declined'
+                                ? 'bg-rose-500/15 text-rose-600'
+                                : t.invitation_status === 'expired'
+                                ? 'bg-red-500/15 text-red-600'
+                                : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                            }`}
+                          >
+                            {t.invitation_status === 'declined'
+                              ? 'Invite Declined'
+                              : t.invitation_status === 'expired'
+                              ? 'Invite Expired'
+                              : 'Awaiting Acceptance'}
+                          </span>
+                          <span className="text-[10px] text-muted">
+                            Can be completed once student accepts
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))

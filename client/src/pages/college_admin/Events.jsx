@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Plus, XCircle, BarChart2, Pencil } from 'lucide-react';
+import { Plus, XCircle, BarChart2, Pencil, Users } from 'lucide-react';
 import { ResourceListPage } from '@/components/common/ResourceListPage';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EditEventModal } from '@/components/events/EditEventModal';
+import { EventParticipantsModal } from '@/components/events/EventParticipantsModal';
 import { eventsApi } from '@/api/events';
 import { formatCurrency, formatDateTime } from '@/utils/format';
 
@@ -14,6 +15,7 @@ export const AdminEvents = () => {
   const navigate = useNavigate();
   const [cancelTarget, setCancelTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
+  const [selectedEventForStudents, setSelectedEventForStudents] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleCancelEvent = async () => {
@@ -90,7 +92,20 @@ export const AdminEvents = () => {
       key: 'actions',
       header: 'Actions',
       render: (row) => (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedEventForStudents(row);
+            }}
+            icon={Users}
+            title="View participants, attendance status, and check-in records"
+          >
+            Attendance
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -148,6 +163,12 @@ export const AdminEvents = () => {
         event={editTarget}
         onClose={() => setEditTarget(null)}
         onSuccess={() => setRefreshKey((k) => k + 1)}
+      />
+
+      <EventParticipantsModal
+        isOpen={Boolean(selectedEventForStudents)}
+        event={selectedEventForStudents}
+        onClose={() => setSelectedEventForStudents(null)}
       />
 
       <ConfirmDialog

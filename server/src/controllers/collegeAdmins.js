@@ -25,6 +25,11 @@ const collegeAdminsController = {
   softDelete: async (req, res) => {
     const result = await collegeAdminsService.softDeleteCollegeAdmin(req.params.id);
     return sendSuccess(res, 200, 'College Admin and College disabled successfully', result);
+  },
+
+  resetPassword: async (req, res) => {
+    const result = await collegeAdminsService.resetPassword(req.params.id, req.body.newPassword);
+    return sendSuccess(res, 200, result.message, result);
   }
 };
 

@@ -37,6 +37,12 @@ router.post(
   asyncHandler(financeController.addTransaction)
 );
 
+router.post(
+  '/manual',
+  validate(addTransactionSchema),
+  asyncHandler(financeController.addTransaction)
+);
+
 router.get(
   '/summary',
   validate(summarySchema, 'query'),

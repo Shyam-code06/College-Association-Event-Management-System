@@ -10,16 +10,62 @@ const { getPaginationParams, buildPaginationMeta } = require('../utils/paginatio
 const membershipsService = {
   /**
    * Creates a new membership plan for the college.
+   * If created by an Organizer, it defaults to pending_approval and requires College Admin approval.
    */
-  createPlan: async (collegeId, planData) => {
-    return membershipModel.createPlan(collegeId, planData);
+  createPlan: async (collegeId, creator, planData) => {
+    const isOrganizer = creator?.role === 'organizer';
+    let assigned = Array.isArray(planData.assigned_organizers)
+      ? [...planData.assigned_organizers]
+      : (planData.assigned_organizers ? [planData.assigned_organizers] : []);
+
+    let organizationName = planData.organization || 'Odoo Student Association';
+    if (isOrganizer) {
+      // Organizer creates plans strictly for their own society & assigned to their own email
+      assigned = creator?.email ? [creator.email.toLowerCase().trim()] : [];
+      if (creator?.name) {
+        const cleaned = creator.name.replace(/\s+organizer$/i, '').trim();
+        organizationName = cleaned || creator.name;
+      }
+    }
+
+    const payload = {
+      ...planData,
+      organization: organizationName,
+      assigned_organizers: assigned,
+      created_by: creator?.id || null,
+      approval_status: isOrganizer ? 'pending_approval' : (planData.approval_status || 'approved'),
+      is_active: isOrganizer ? false : (planData.is_active !== undefined ? planData.is_active : true)
+    };
+
+    return membershipModel.createPlan(collegeId, payload);
   },
 
   /**
-   * Lists all active membership plans for the college.
+   * Approves or rejects a membership plan (College Admin).
    */
-  listPlans: async (collegeId) => {
-    return membershipModel.findAllPlans(collegeId);
+  reviewPlanApproval: async (id, collegeId, approvalStatus) => {
+    const plan = await membershipModel.findPlanById(id, collegeId);
+    if (!plan) {
+      throw new AppError('Membership plan not found', 404);
+    }
+
+    const updatePayload = {
+      approval_status: approvalStatus,
+      is_active: approvalStatus === 'approved'
+    };
+
+    return membershipModel.updatePlan(id, collegeId, updatePayload);
+  },
+
+  /**
+   * Lists membership plans for the college according to user role.
+   */
+  listPlans: async (collegeId, user) => {
+    return membershipModel.findAllPlans(collegeId, {
+      role: user?.role,
+      userEmail: user?.email,
+      userId: user?.id
+    });
   },
 
   /**
@@ -169,12 +215,13 @@ const membershipsService = {
   },
 
   /**
-   * College Admin directly creates / grants a student membership for an organization.
+   * College Admin or Organizer directly grants student membership(s) for an organization.
+   * Supports assigning multiple students simultaneously via `userIds`.
    */
-  adminCreateMembership: async (collegeId, { userId, planId, organization, status, duesStatus, durationMonths }) => {
-    const user = await userModel.findById(userId, collegeId);
-    if (!user) {
-      throw new AppError('Student user not found in this college', 404);
+  adminCreateMembership: async (collegeId, { userId, userIds, planId, organization, status, duesStatus, durationMonths }) => {
+    const targetUserIds = Array.isArray(userIds) && userIds.length > 0 ? userIds : (userId ? [userId] : []);
+    if (targetUserIds.length === 0) {
+      throw new AppError('At least one student must be selected', 400);
     }
 
     const plan = await membershipModel.findPlanById(planId, collegeId);
@@ -192,17 +239,38 @@ const membershipsService = {
     const startDate = start.toISOString().split('T')[0];
     const expiryDate = expiry.toISOString().split('T')[0];
 
-    const membership = await membershipModel.createMembership(collegeId, {
-      user_id: userId,
-      plan_id: planId,
-      organization: orgToUse,
-      status: status || MEMBERSHIP_STATUS.ACTIVE,
-      dues_status: duesStatus || DUES_STATUS.PAID,
-      start_date: startDate,
-      expiry_date: expiryDate
-    });
+    const results = [];
+    for (const uid of targetUserIds) {
+      const user = await userModel.findById(uid, collegeId);
+      if (!user) continue;
 
-    return membership;
+      // Check if student already has active membership for this plan
+      const existing = await membershipModel.findByUserId(uid, collegeId);
+      if (existing && existing.status === MEMBERSHIP_STATUS.ACTIVE) {
+        // Update existing expiry if renewing/extending
+        await membershipModel.updateMembership(existing.id, collegeId, {
+          plan_id: planId,
+          organization: orgToUse,
+          status: MEMBERSHIP_STATUS.ACTIVE,
+          dues_status: DUES_STATUS.PAID,
+          expiry_date: expiryDate
+        });
+        results.push(existing);
+      } else {
+        const membership = await membershipModel.createMembership(collegeId, {
+          user_id: uid,
+          plan_id: planId,
+          organization: orgToUse,
+          status: status || MEMBERSHIP_STATUS.ACTIVE,
+          dues_status: duesStatus || DUES_STATUS.PAID,
+          start_date: startDate,
+          expiry_date: expiryDate
+        });
+        results.push(membership);
+      }
+    }
+
+    return results.length === 1 ? results[0] : results;
   },
 
   /**

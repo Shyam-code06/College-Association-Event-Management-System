@@ -2,9 +2,8 @@ import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { CheckCircle2, ArrowLeft } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { Wizard } from '@/components/ui/Wizard';
-import { Button } from '@/components/ui/Button';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
@@ -270,15 +269,6 @@ export const EventCreate = () => {
 
   return (
     <div className="py-10 max-w-4xl mx-auto px-4">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => navigate('/organizer/events')}
-        icon={ArrowLeft}
-        className="mb-4"
-      >
-        Back to Events
-      </Button>
       <Wizard
         steps={steps}
         store={wizardStore}

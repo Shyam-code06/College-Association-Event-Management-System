@@ -14,6 +14,14 @@ if (env.NODE_ENV === 'test' || !env.SMTP_HOST || env.SMTP_USER === 'mock_user') 
       };
     }
   };
+} else if (env.SMTP_HOST && (env.SMTP_HOST.includes('gmail') || (env.SMTP_USER && env.SMTP_USER.endsWith('@gmail.com')))) {
+  transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: env.SMTP_USER,
+      pass: env.SMTP_PASS
+    }
+  });
 } else {
   transporter = nodemailer.createTransport({
     host: env.SMTP_HOST,

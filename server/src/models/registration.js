@@ -124,7 +124,12 @@ const registrationModel = {
       query = query.where('registrations.status', status);
     }
 
-    return query.orderBy('registrations.created_at', 'asc').offset(offset).limit(limit);
+    const rows = await query.orderBy('registrations.created_at', 'asc').offset(offset).limit(limit);
+    return rows.map((r) => ({
+      ...r,
+      checked_in: Boolean(r.checked_in_at),
+      check_in_time: r.checked_in_at
+    }));
   },
 
   getEventReportStats: async (eventId, collegeId, trx = db) => {

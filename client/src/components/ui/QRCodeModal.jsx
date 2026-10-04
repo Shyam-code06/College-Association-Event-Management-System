@@ -36,7 +36,7 @@ export const QRCodeModal = ({ isOpen, onClose, ticketData }) => {
         <div>
           <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold font-mono mb-1.5">
             <Hash className="h-3.5 w-3.5" />
-            Pass ID: #{ticketData.registration_id}
+            Pass ID: {ticketData.registration_id}
           </div>
           <h4 className="text-base font-bold text-ink">{ticketData.event_name}</h4>
           <p className="text-xs text-muted mt-0.5">
@@ -93,7 +93,7 @@ export const QRCodeModal = ({ isOpen, onClose, ticketData }) => {
 
           <div className="bg-surface/80 rounded px-2 py-1 text-xs font-mono text-ink border border-line flex items-center justify-between">
             <span className="text-muted font-sans text-[11px]">Pass ID:</span>
-            <span className="font-bold text-primary">#{ticketData.registration_id}</span>
+            <span className="font-bold text-primary">{ticketData.registration_id}</span>
           </div>
 
           {ticketData.qr_token && (
@@ -108,7 +108,7 @@ export const QRCodeModal = ({ isOpen, onClose, ticketData }) => {
           )}
 
           <p className="text-[10px] text-muted leading-tight">
-            Give your <strong>Pass ID (#{ticketData.registration_id})</strong> or <strong>Token</strong> to the organizer for manual check-in.
+            Give your <strong>Pass ID ({ticketData.registration_id})</strong> or <strong>Token</strong> to the organizer for manual check-in.
           </p>
         </div>
 

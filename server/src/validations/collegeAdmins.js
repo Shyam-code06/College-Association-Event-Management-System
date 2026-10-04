@@ -20,8 +20,13 @@ const listCollegeAdminsSchema = Joi.object({
   isActive: Joi.string().valid('true', 'false')
 });
 
+const resetCollegeAdminPasswordSchema = Joi.object({
+  newPassword: Joi.string().min(6).max(100).optional().allow('')
+});
+
 module.exports = {
   createCollegeAdminSchema,
   toggleAccessSchema,
-  listCollegeAdminsSchema
+  listCollegeAdminsSchema,
+  resetCollegeAdminPasswordSchema
 };

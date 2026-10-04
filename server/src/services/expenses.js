@@ -5,6 +5,20 @@ const { EXPENSE_STATUS, FINANCE_TYPE, TRANSACTION_SOURCE } = require('../constan
 const AppError = require('../utils/appError');
 const { getPaginationParams, buildPaginationMeta } = require('../utils/pagination');
 
+const mapExpense = (expense) => {
+  if (!expense) return expense;
+  let receiptUrl = null;
+  if (expense.receipt_path) {
+    const normalized = expense.receipt_path.replace(/\\/g, '/');
+    const uploadsIdx = normalized.indexOf('uploads/');
+    receiptUrl = uploadsIdx !== -1 ? '/' + normalized.substring(uploadsIdx) : (normalized.startsWith('/') ? normalized : '/' + normalized);
+  }
+  return {
+    ...expense,
+    receipt_url: receiptUrl
+  };
+};
+
 const expensesService = {
   /**
    * Submits a new expense reimbursement request (Student).
@@ -14,7 +28,7 @@ const expensesService = {
    * @param {object} payload
    */
   submitExpense: async (studentId, collegeId, { amount, reason, event_id, fundraiser_id, receiptPath }) => {
-    return expenseModel.create(collegeId, {
+    const created = await expenseModel.create(collegeId, {
       submitter_id: studentId,
       amount: parseFloat(amount),
       reason,
@@ -23,6 +37,7 @@ const expensesService = {
       receipt_path: receiptPath,
       status: EXPENSE_STATUS.SUBMITTED
     });
+    return mapExpense(created);
   },
 
   /**
@@ -38,7 +53,7 @@ const expensesService = {
     const total = await expenseModel.count(collegeId, { status: queryParams.status });
 
     return {
-      data: expenses,
+      data: expenses.map(mapExpense),
       meta: buildPaginationMeta(total, page, limit)
     };
   },
@@ -52,7 +67,7 @@ const expensesService = {
     const total = await expenseModel.countStudentExpenses(studentId, collegeId);
 
     return {
-      data: expenses,
+      data: expenses.map(mapExpense),
       meta: buildPaginationMeta(total, page, limit)
     };
   },
@@ -65,7 +80,7 @@ const expensesService = {
     if (!expense) {
       throw new AppError('Expense request not found', 404);
     }
-    return expense;
+    return mapExpense(expense);
   },
 
   /**

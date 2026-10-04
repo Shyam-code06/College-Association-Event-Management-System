@@ -93,7 +93,7 @@ export const StudentDashboard = () => {
             Hello, {user?.name}
           </h1>
           <p className="text-xs sm:text-sm text-muted mt-1">
-            Welcome to your Skyline student association portal. Track your passes and events.
+            Welcome to your Odoo student organization portal. Track your passes and events.
           </p>
         </div>
 

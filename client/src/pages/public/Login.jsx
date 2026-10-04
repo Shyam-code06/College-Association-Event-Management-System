@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
+import { StudentForgotPasswordModal } from '@/components/auth/StudentForgotPasswordModal';
 import { useAuthStore } from '@/stores/auth';
 import { authApi } from '@/api/auth';
 
@@ -24,11 +25,13 @@ export const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [approvalNotice, setApprovalNotice] = useState(null);
   const [isRequestingApproval, setIsRequestingApproval] = useState(false);
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
 
   const {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(loginSchema),
@@ -91,13 +94,13 @@ export const Login = () => {
               <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center text-surface shadow-xs transition-transform group-hover:scale-105">
                 <Sparkles className="h-6 w-6" />
               </div>
-              <span className="text-xl font-bold tracking-tight text-ink">Skyline</span>
+              <span className="text-xl font-bold tracking-tight text-ink">Odoo</span>
             </Link>
             <h2 className="text-2xl font-extrabold tracking-tight text-ink mt-1">
               Sign in to your account
             </h2>
             <p className="text-xs text-muted mt-1.5 leading-relaxed">
-              Access your student association apps and dashboard
+              Access your student organization apps and dashboard
             </p>
           </div>
 
@@ -111,19 +114,26 @@ export const Login = () => {
             >
               <Input
                 type="email"
-                placeholder="name@skyline.edu"
+                placeholder="name@odoo.com"
                 className="h-11 px-3.5 text-sm rounded-lg border-line focus:ring-2 focus:ring-primary/20"
                 {...register('email')}
                 disabled={isLoading}
               />
             </FormField>
 
-            <FormField
-              label="PASSWORD"
-              required
-              error={errors.password?.message}
-              labelClassName="text-[11px] font-bold uppercase tracking-wider text-ink"
-            >
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-ink">
+                  PASSWORD <span className="text-danger">*</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsForgotModalOpen(true)}
+                  className="text-[11px] font-medium text-primary hover:underline"
+                >
+                  Forgot Password?
+                </button>
+              </div>
               <Input
                 type="password"
                 placeholder="••••••••"
@@ -131,7 +141,10 @@ export const Login = () => {
                 {...register('password')}
                 disabled={isLoading}
               />
-            </FormField>
+              {errors.password && (
+                <p className="text-xs text-danger">{errors.password.message}</p>
+              )}
+            </div>
 
             <Button
               type="submit"
@@ -186,6 +199,13 @@ export const Login = () => {
             </p>
           </div>
         </Card>
+
+        {/* Student Forgot Password Modal */}
+        <StudentForgotPasswordModal
+          isOpen={isForgotModalOpen}
+          onClose={() => setIsForgotModalOpen(false)}
+          defaultEmail={watch('email') || ''}
+        />
       </div>
     </div>
   );

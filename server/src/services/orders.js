@@ -116,10 +116,18 @@ const ordersService = {
     const total = await orderModel.countOrders(collegeId, { status: queryParams.status });
 
     const ordersWithItems = await Promise.all(
-      orders.map(async (ord) => {
+      orders.map(async (ord, idx) => {
         const items = await orderModel.findOrderItems(ord.id, collegeId);
+        const firstItem = items && items[0];
+        const totalQuantity = (items || []).reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
         return {
           ...ord,
+          order_number: offset + idx + 1,
+          student_name: ord.user_name || ord.student_name || 'Student',
+          student_email: ord.user_email || ord.student_email || '',
+          product_name: firstItem ? firstItem.product_name : 'Merchandise',
+          size: firstItem ? (firstItem.variant_size || firstItem.size || '') : '',
+          quantity: totalQuantity || 1,
           items
         };
       })
@@ -140,10 +148,16 @@ const ordersService = {
     const total = await orderModel.countStudentOrders(userId, collegeId);
 
     const ordersWithItems = await Promise.all(
-      orders.map(async (ord) => {
+      orders.map(async (ord, idx) => {
         const items = await orderModel.findOrderItems(ord.id, collegeId);
+        const firstItem = items && items[0];
+        const totalQuantity = (items || []).reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
         return {
           ...ord,
+          order_number: offset + idx + 1,
+          product_name: firstItem ? firstItem.product_name : 'Merchandise',
+          size: firstItem ? (firstItem.variant_size || firstItem.size || '') : '',
+          quantity: totalQuantity || 1,
           items
         };
       })

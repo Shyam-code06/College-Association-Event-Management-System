@@ -19,6 +19,7 @@ import {
   PlusCircle,
   CheckSquare,
   GraduationCap,
+  KeyRound,
 } from 'lucide-react';
 
 import { ROLES } from '@/utils/constants';
@@ -77,6 +78,13 @@ export const APP_NAVIGATION = {
       description: 'All college association events and registrations',
       path: '/admin/events',
       icon: Calendar,
+    },
+    {
+      id: 'scanner',
+      title: 'Pass Scan & Attendance',
+      description: 'Live QR scanner, manual ticket entry, and attendance records',
+      path: '/admin/scanner',
+      icon: QrCode,
     },
     {
       id: 'finance',
@@ -176,8 +184,22 @@ export const APP_NAVIGATION = {
       id: 'expenses',
       title: 'Submit Expense',
       description: 'Claim reimbursement with receipt upload',
-      path: '/student/expenses',
+      path: '/organizer/expenses',
       icon: Receipt,
+    },
+    {
+      id: 'plans',
+      title: 'Membership Plans',
+      description: 'Create & manage association membership plans for your club',
+      path: '/organizer/plans',
+      icon: Award,
+    },
+    {
+      id: 'members',
+      title: 'Members Directory',
+      description: 'View and grant association memberships for enrolled students',
+      path: '/organizer/members',
+      icon: Users,
     },
     {
       id: 'announcements',
@@ -230,13 +252,6 @@ export const APP_NAVIGATION = {
       description: 'Track orders, receipts, and order statuses',
       path: '/student/orders',
       icon: Package,
-    },
-    {
-      id: 'expenses',
-      title: 'My Expenses',
-      description: 'Submit and track reimbursement claims',
-      path: '/student/expenses',
-      icon: Receipt,
     },
     {
       id: 'tasks',

@@ -71,7 +71,7 @@ export const Students = () => {
     {
       key: 'id',
       header: 'Student ID',
-      render: (row) => <span className="font-mono font-semibold text-primary">#{row.id}</span>,
+      render: (row) => <span className="font-mono font-semibold text-primary">{row.id}</span>,
     },
     {
       key: 'name',

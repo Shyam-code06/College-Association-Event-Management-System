@@ -11,10 +11,15 @@ const announcementsService = {
    * @param {number} authorId
    * @param {object} payload - { title, message }
    */
-  createAnnouncement: async (collegeId, authorId, { title, message }) => {
+  createAnnouncement: async (collegeId, authorId, payload) => {
+    const title = payload.title?.trim();
+    const message = (payload.message || payload.content)?.trim();
+    const priority = payload.priority || 'INFO';
+
     return announcementModel.create(collegeId, {
       title,
       message,
+      priority,
       posted_by: authorId
     });
   },
@@ -36,12 +41,15 @@ const announcementsService = {
       collegeId: a.college_id,
       title: a.title,
       message: a.message,
+      content: a.message,
+      priority: a.priority || 'INFO',
       author: {
         id: a.posted_by,
         name: a.author_name,
         role: a.author_role
       },
-      createdAt: a.created_at
+      createdAt: a.created_at,
+      created_at: a.created_at
     }));
 
     return {

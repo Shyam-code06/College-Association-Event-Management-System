@@ -9,7 +9,7 @@ const submitExpenseSchema = Joi.object({
 });
 
 const reviewExpenseSchema = Joi.object({
-  status: Joi.string().valid(EXPENSE_STATUS.APPROVED, EXPENSE_STATUS.REJECTED).required(),
+  status: Joi.string().trim().lowercase().valid(EXPENSE_STATUS.APPROVED, EXPENSE_STATUS.REJECTED).required(),
   review_note: Joi.string().trim().allow(null, '')
 });
 

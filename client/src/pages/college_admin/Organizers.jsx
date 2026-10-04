@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
-import { Plus, Trash2, CheckCircle2, ShieldAlert, UserX, CheckCheck } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, ShieldAlert, UserX, CheckCheck, KeyRound } from 'lucide-react';
 import { ResourceListPage } from '@/components/common/ResourceListPage';
 import { Switch } from '@/components/ui/Switch';
 import { Button } from '@/components/ui/Button';
@@ -28,9 +28,44 @@ export const Organizers = () => {
   // Delete Confirm
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  // Reset Password Modal
+  const [resetTarget, setResetTarget] = useState(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState('123456');
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleOpenResetModal = (organizer) => {
+    setResetTarget(organizer);
+    setResetPasswordValue('123456');
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (!resetTarget) return;
+    const pwd = resetPasswordValue.trim() || '123456';
+    if (pwd.length < 6) {
+      toast.error('Password must be at least 6 characters.');
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      await organizersApi.resetPassword(resetTarget.id, pwd);
+      toast.success(
+        `Password reset to "${pwd}" for ${resetTarget.name} (${resetTarget.email})!`
+      );
+      setResetTarget(null);
+      setResetPasswordValue('123456');
+    } catch (err) {
+      toast.error(err?.message || 'Failed to reset password.');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   const handleToggleAccess = async (organizer, desiredStatus) => {
     setProcessingId(organizer.id);
-    const newStatus = typeof desiredStatus === 'boolean' ? desiredStatus : !organizer.is_active;
+    const currentActive = Boolean(organizer.isActive ?? organizer.is_active);
+    const newStatus = typeof desiredStatus === 'boolean' ? desiredStatus : !currentActive;
     try {
       await organizersApi.toggleAccess(organizer.id, newStatus);
       if (newStatus) {
@@ -122,76 +157,96 @@ export const Organizers = () => {
     {
       key: 'status',
       header: 'Approval Status',
-      render: (row) => (
-        <div>
-          {row.is_active ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-sm bg-success/15 text-success text-xs font-semibold">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Active / Approved
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-sm bg-warning/15 text-warning text-xs font-semibold">
-              <ShieldAlert className="h-3.5 w-3.5" />
-              Deactivated / Inactive
-            </span>
-          )}
-        </div>
-      ),
+      render: (row) => {
+        const isActive = Boolean(row.isActive ?? row.is_active);
+        return (
+          <div>
+            {isActive ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-sm bg-success/15 text-success text-xs font-semibold">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Active / Approved
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-sm bg-warning/15 text-warning text-xs font-semibold">
+                <ShieldAlert className="h-3.5 w-3.5" />
+                Deactivated / Inactive
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'is_active',
       header: 'Access Allowed',
-      render: (row) => (
-        <Switch
-          checked={Boolean(row.is_active)}
-          onChange={() => handleToggleAccess(row)}
-          disabled={processingId === row.id}
-        />
-      ),
+      render: (row) => {
+        const isActive = Boolean(row.isActive ?? row.is_active);
+        return (
+          <Switch
+            checked={isActive}
+            onChange={() => handleToggleAccess(row)}
+            disabled={processingId === row.id}
+          />
+        );
+      },
     },
     {
       key: 'created_at',
       header: 'Created On',
-      render: (row) => formatDateTime(row.created_at),
+      render: (row) => formatDateTime(row.created_at || row.createdAt),
     },
     {
       key: 'actions',
       header: 'Account Actions',
-      render: (row) => (
-        <div className="flex items-center gap-2">
-          {!row.is_active ? (
-            <Button
-              variant="primary"
-              size="sm"
-              icon={CheckCircle2}
-              isLoading={processingId === row.id}
-              onClick={() => handleToggleAccess(row, true)}
-              className="bg-success hover:bg-success/90 text-white"
-            >
-              Approve
-            </Button>
-          ) : (
+      render: (row) => {
+        const isActive = Boolean(row.isActive ?? row.is_active);
+        return (
+          <div className="flex items-center gap-2">
+            {!isActive ? (
+              <Button
+                variant="primary"
+                size="sm"
+                icon={CheckCircle2}
+                isLoading={processingId === row.id}
+                onClick={() => handleToggleAccess(row, true)}
+                className="bg-success hover:bg-success/90 text-white"
+              >
+                Approve
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                icon={UserX}
+                isLoading={processingId === row.id}
+                onClick={() => handleToggleAccess(row, false)}
+                className="text-danger hover:bg-danger/10 border-danger/30"
+              >
+                Deactivate
+              </Button>
+            )}
+
             <Button
               variant="outline"
               size="sm"
-              icon={UserX}
-              isLoading={processingId === row.id}
-              onClick={() => handleToggleAccess(row, false)}
-              className="text-danger hover:bg-danger/10 border-danger/30"
+              icon={KeyRound}
+              onClick={() => handleOpenResetModal(row)}
+              title="Reset Organizer Password (default: 123456)"
+              className="text-xs text-ink hover:text-primary hover:border-primary"
             >
-              Deactivate
+              Reset Password
             </Button>
-          )}
 
-          <IconButton
-            variant="danger"
-            size="sm"
-            icon={Trash2}
-            onClick={() => setDeleteTarget(row)}
-            title="Delete Organizer"
-          />
-        </div>
-      ),
+            <IconButton
+              variant="danger"
+              size="sm"
+              icon={Trash2}
+              onClick={() => setDeleteTarget(row)}
+              title="Delete Organizer"
+            />
+          </div>
+        );
+      },
     },
   ];
 
@@ -286,6 +341,70 @@ export const Organizers = () => {
         confirmLabel="Delete Organizer"
         variant="danger"
       />
+
+      {/* Reset Password Modal */}
+      <Modal
+        isOpen={Boolean(resetTarget)}
+        onClose={() => setResetTarget(null)}
+        title="Reset Organizer Password"
+        maxWidth="max-w-md"
+      >
+        <form onSubmit={handleResetPassword} className="space-y-4">
+          <div className="p-3 bg-canvas border border-line rounded-md text-xs text-muted space-y-1">
+            <p className="font-semibold text-ink">
+              Organizer: {resetTarget?.name}
+            </p>
+            <p className="font-mono text-[11px] text-muted truncate">
+              {resetTarget?.email}
+            </p>
+          </div>
+
+          <FormField
+            label="New Password"
+            required
+            hint="Default is 123456. You can keep it or enter a custom password."
+          >
+            <div className="space-y-2">
+              <Input
+                type="text"
+                placeholder="123456"
+                value={resetPasswordValue}
+                onChange={(e) => setResetPasswordValue(e.target.value)}
+                required
+                minLength={6}
+              />
+              <div className="flex items-center justify-between text-xs pt-1">
+                <span className="text-muted text-[11px]">Quick default:</span>
+                <button
+                  type="button"
+                  onClick={() => setResetPasswordValue('123456')}
+                  className="text-primary hover:underline font-semibold text-xs"
+                >
+                  Set to 123456
+                </button>
+              </div>
+            </div>
+          </FormField>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-line">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setResetTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              isLoading={isResetting}
+              icon={KeyRound}
+            >
+              Reset Password
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </>
   );
 };

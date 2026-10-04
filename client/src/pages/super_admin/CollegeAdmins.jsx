@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Plus, Trash2, Building } from 'lucide-react';
+import { Plus, Building, KeyRound } from 'lucide-react';
 import { ResourceListPage } from '@/components/common/ResourceListPage';
 import { Switch } from '@/components/ui/Switch';
-import { IconButton } from '@/components/ui/IconButton';
+import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
+import { FormField } from '@/components/ui/FormField';
+import { Input } from '@/components/ui/Input';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { superAdminApi } from '@/api/superAdmin';
 import { formatDateTime } from '@/utils/format';
@@ -13,38 +16,58 @@ export const CollegeAdmins = () => {
   const navigate = useNavigate();
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Toggle Confirm
+  // Toggle Confirm (Deactivate / Activate)
   const [toggleTarget, setToggleTarget] = useState(null);
 
-  // Delete Confirm
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  // Reset Password Modal
+  const [resetTarget, setResetTarget] = useState(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState('123456');
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleOpenResetModal = (admin) => {
+    setResetTarget(admin);
+    setResetPasswordValue('123456');
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (!resetTarget) return;
+    const pwd = resetPasswordValue.trim() || '123456';
+    if (pwd.length < 6) {
+      toast.error('Password must be at least 6 characters.');
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      await superAdminApi.resetPassword(resetTarget.id, pwd);
+      toast.success(
+        `Password reset to "${pwd}" for ${resetTarget.name} (${resetTarget.email})!`
+      );
+      setResetTarget(null);
+      setResetPasswordValue('123456');
+    } catch (err) {
+      toast.error(err?.message || 'Failed to reset password.');
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   const confirmToggleAccess = async () => {
     if (!toggleTarget) return;
     try {
-      const nextState = !toggleTarget.is_active;
+      const currentActive = Boolean(toggleTarget.is_active ?? toggleTarget.isActive);
+      const nextState = !currentActive;
       await superAdminApi.toggleAccess(toggleTarget.id, { isActive: nextState });
       toast.success(
         nextState
-          ? `Access granted for ${toggleTarget.name}`
-          : `Access revoked for ${toggleTarget.name}`
+          ? `Access activated for ${toggleTarget.name}`
+          : `Access deactivated for ${toggleTarget.name}`
       );
       setToggleTarget(null);
       setRefreshKey((k) => k + 1);
     } catch (err) {
-      toast.error(err?.message || 'Failed to toggle access.');
-    }
-  };
-
-  const confirmDelete = async () => {
-    if (!deleteTarget) return;
-    try {
-      await superAdminApi.deleteCollegeAdmin(deleteTarget.id);
-      toast.success('College administrator removed.');
-      setDeleteTarget(null);
-      setRefreshKey((k) => k + 1);
-    } catch (err) {
-      toast.error(err?.message || 'Failed to delete college admin.');
+      toast.error(err?.message || 'Failed to update access status.');
     }
   };
 
@@ -62,21 +85,25 @@ export const CollegeAdmins = () => {
     {
       key: 'college_name',
       header: 'Assigned College',
-      render: (row) => (
-        <div className="flex items-center gap-1.5">
-          <Building className="h-4 w-4 text-primary" />
-          <span className="font-semibold text-ink">
-            {row.college_name || `College #${row.college_id}`}
-          </span>
-        </div>
-      ),
+      render: (row) => {
+        const collegeName = row.college_name || row.college?.name;
+        const collegeId = row.college_id || row.college?.id;
+        return (
+          <div className="flex items-center gap-1.5">
+            <Building className="h-4 w-4 text-primary" />
+            <span className="font-semibold text-ink">
+              {collegeName || (collegeId ? `College #${collegeId}` : 'No College Assigned')}
+            </span>
+          </div>
+        );
+      },
     },
     {
       key: 'is_active',
       header: 'Active Status',
       render: (row) => (
         <Switch
-          checked={Boolean(row.is_active)}
+          checked={Boolean(row.is_active ?? row.isActive)}
           onChange={() => setToggleTarget(row)}
         />
       ),
@@ -84,19 +111,22 @@ export const CollegeAdmins = () => {
     {
       key: 'created_at',
       header: 'Created On',
-      render: (row) => formatDateTime(row.created_at),
+      render: (row) => formatDateTime(row.created_at || row.createdAt),
     },
     {
       key: 'actions',
       header: 'Actions',
       render: (row) => (
-        <IconButton
-          variant="danger"
+        <Button
+          variant="outline"
           size="sm"
-          icon={Trash2}
-          onClick={() => setDeleteTarget(row)}
-          title="Delete Admin"
-        />
+          icon={KeyRound}
+          onClick={() => handleOpenResetModal(row)}
+          title="Reset College Admin Password"
+          className="text-xs font-semibold text-primary border-primary/30 hover:bg-primary/10 gap-1.5 whitespace-nowrap"
+        >
+          Reset Password
+        </Button>
       ),
     },
   ];
@@ -119,27 +149,85 @@ export const CollegeAdmins = () => {
         searchPlaceholder="Search administrators..."
       />
 
-      {/* Confirm Access Toggle */}
+      {/* Reset Password Modal */}
+      <Modal
+        isOpen={Boolean(resetTarget)}
+        onClose={() => setResetTarget(null)}
+        title="Reset College Admin Password"
+        maxWidth="max-w-md"
+      >
+        <form onSubmit={handleResetPassword} className="space-y-4">
+          <div className="p-3 bg-canvas border border-line rounded-md text-xs text-muted space-y-1">
+            <p className="font-semibold text-ink">
+              Administrator: {resetTarget?.name}
+            </p>
+            <p className="font-mono text-[11px] text-muted truncate">
+              {resetTarget?.email}
+            </p>
+            {(resetTarget?.college_name || resetTarget?.college?.name) && (
+              <p className="text-[11px] text-primary font-medium">
+                {resetTarget.college_name || resetTarget.college?.name}
+              </p>
+            )}
+          </div>
+
+          <FormField
+            label="New Password"
+            required
+            hint="Default is 123456. You can keep it or enter a custom password."
+          >
+            <div className="space-y-2">
+              <Input
+                type="text"
+                placeholder="123456"
+                value={resetPasswordValue}
+                onChange={(e) => setResetPasswordValue(e.target.value)}
+                required
+                minLength={6}
+              />
+              <div className="flex items-center justify-between text-xs pt-1">
+                <span className="text-muted text-[11px]">Quick default:</span>
+                <button
+                  type="button"
+                  onClick={() => setResetPasswordValue('123456')}
+                  className="text-primary hover:underline font-semibold text-xs"
+                >
+                  Set to 123456
+                </button>
+              </div>
+            </div>
+          </FormField>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-line">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setResetTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              isLoading={isResetting}
+              icon={KeyRound}
+            >
+              Reset Password
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Confirm Access Toggle (Deactivate / Activate) */}
       <ConfirmDialog
         isOpen={Boolean(toggleTarget)}
         onClose={() => setToggleTarget(null)}
         onConfirm={confirmToggleAccess}
         title="Change Admin Access"
         description={`Are you sure you want to ${
-          toggleTarget?.is_active ? 'deactivate' : 'activate'
+          (toggleTarget?.is_active ?? toggleTarget?.isActive) ? 'deactivate' : 'activate'
         } access for ${toggleTarget?.name}?`}
         confirmText="Confirm Change"
-      />
-
-      {/* Confirm Delete */}
-      <ConfirmDialog
-        isOpen={Boolean(deleteTarget)}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={confirmDelete}
-        title="Delete College Admin"
-        description={`Are you sure you want to permanently delete ${deleteTarget?.name}? This action cannot be undone.`}
-        confirmText="Delete Admin"
-        variant="danger"
       />
     </>
   );

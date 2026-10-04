@@ -62,9 +62,17 @@ const ChoosePlanStep = ({ formData, updateFormData, errors }) => {
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-bold text-sm text-ink">{plan.name}</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-sm text-ink">{plan.name}</h4>
+                    {plan.organization && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-primary/10 text-primary border border-primary/20">
+                        {plan.organization}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted mt-0.5">
                     Valid for {plan.duration_months || 12} months
+                    {plan.ticket_discount_note ? ` • ${plan.ticket_discount_note}` : ' • Discounted member rates'}
                   </p>
                 </div>
                 <div className="text-right">
@@ -96,6 +104,12 @@ const ReviewPlanStep = ({ formData }) => {
           <span className="text-muted">Selected Tier</span>
           <span className="font-semibold text-ink">{plan.name}</span>
         </div>
+        {plan.organization && (
+          <div className="flex justify-between py-1 border-b border-line">
+            <span className="text-muted">Organization</span>
+            <span className="font-semibold text-primary">{plan.organization}</span>
+          </div>
+        )}
         <div className="flex justify-between py-1 border-b border-line">
           <span className="text-muted">Duration</span>
           <span className="font-semibold text-ink">
@@ -274,10 +288,11 @@ export const Membership = () => {
               Active Member
             </span>
             <h1 className="text-2xl font-bold text-ink">
+              {currentMembership.organization ? `${currentMembership.organization} - ` : ''}
               {currentMembership.plan_name || 'Student Association Member'}
             </h1>
             <p className="text-xs text-muted mt-1">
-              Member ID: #{currentMembership.id} • Expires: {formatDate(currentMembership.expiry_date)}
+              Member ID: {currentMembership.id} • Expires: {formatDate(currentMembership.expiry_date)}
             </p>
           </div>
 

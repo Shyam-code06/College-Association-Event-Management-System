@@ -22,9 +22,14 @@ const listOrganizersSchema = Joi.object({
   isActive: Joi.string().valid('true', 'false')
 });
 
+const resetOrganizerPasswordSchema = Joi.object({
+  newPassword: Joi.string().min(6).max(100).default('123456').allow('', null)
+});
+
 module.exports = {
   createOrganizerSchema,
   updateOrganizerSchema,
   toggleOrganizerAccessSchema,
-  listOrganizersSchema
+  listOrganizersSchema,
+  resetOrganizerPasswordSchema
 };

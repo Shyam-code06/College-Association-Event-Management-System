@@ -96,7 +96,7 @@ export const MyTickets = () => {
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <Badge status={reg.status || 'CONFIRMED'} />
                   <span className="text-[11px] font-mono text-muted">
-                    Pass #{reg.id}
+                    Pass {reg.id}
                   </span>
                 </div>
 
