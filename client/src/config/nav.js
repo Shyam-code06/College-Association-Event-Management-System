@@ -65,6 +65,13 @@ export const APP_NAVIGATION = {
       icon: Award,
     },
     {
+      id: 'members',
+      title: 'Enrolled Members',
+      description: 'Enrolled students by plan and cancellation reviews',
+      path: '/admin/members',
+      icon: UserCheck,
+    },
+    {
       id: 'events',
       title: 'Events',
       description: 'All college association events and registrations',
@@ -185,6 +192,13 @@ export const APP_NAVIGATION = {
       description: 'Create & manage association membership plans for your club',
       path: '/organizer/plans',
       icon: Award,
+    },
+    {
+      id: 'members',
+      title: 'Enrolled Members',
+      description: 'View students enrolled in your club and handle cancellations',
+      path: '/organizer/members',
+      icon: UserCheck,
     },
     {
       id: 'announcements',

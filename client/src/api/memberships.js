@@ -12,6 +12,10 @@ export const membershipsApi = {
   adminCreate: (data) => apiClient.post('/memberships/admin-create', data),
   deleteMember: (id) => apiClient.delete(`/memberships/${id}`),
   verifyMembership: (id) => apiClient.get(`/memberships/${id}/verify`),
+  requestCancellation: (id, reason) => apiClient.post(`/memberships/${id}/cancel-request`, { reason }),
+  reviewCancellation: (id, action, reviewNote) =>
+    apiClient.patch(`/memberships/${id}/review-cancellation`, { action, reviewNote }),
+  getPlanMembers: (planId) => apiClient.get(`/memberships/plans/${planId}/members`),
 };
 
 export default membershipsApi;

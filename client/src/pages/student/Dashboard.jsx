@@ -135,7 +135,11 @@ export const StudentDashboard = () => {
         />
         <StatCard
           title="Merch Discount"
-          value={isMember && membership?.merch_discount_percent ? `${membership.merch_discount_percent}% OFF` : '0%'}
+          value={
+            isMember && (membership?.maxDiscountPercent || membership?.merch_discount_percent)
+              ? `${Number(membership?.maxDiscountPercent ?? membership?.merch_discount_percent)}% OFF`
+              : '0%'
+          }
           subtitle="Exclusive store savings"
           icon={ShoppingBag}
           indicator="secondary"

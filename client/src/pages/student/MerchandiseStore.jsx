@@ -214,8 +214,22 @@ export const MerchandiseStore = () => {
         const mem = memRes.value.data;
         const isMem = Boolean(mem.isActive || String(mem.status).toUpperCase() === 'ACTIVE');
         if (isMem) {
-          const disc = Number(mem.merch_discount_percent ?? mem.membership?.merch_discount_percent ?? 10);
-          setDiscountPercent(disc);
+          // If multiple memberships exist, pick the maximum profitable discount value
+          const candidates = [
+            Number(mem.maxDiscountPercent || 0),
+            Number(mem.merch_discount_percent || 0),
+            Number(mem.membership?.merch_discount_percent || 0),
+            ...(Array.isArray(mem.activeMemberships)
+              ? mem.activeMemberships.map((m) => Number(m.merch_discount_percent || 0))
+              : []),
+            ...(Array.isArray(mem.memberships)
+              ? mem.memberships
+                  .filter((m) => String(m.status).toUpperCase() === 'ACTIVE')
+                  .map((m) => Number(m.merch_discount_percent || 0))
+              : []),
+          ];
+          const maxDisc = Math.max(...candidates, 0);
+          setDiscountPercent(maxDisc);
         }
       }
       setLoading(false);

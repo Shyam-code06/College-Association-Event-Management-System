@@ -44,11 +44,14 @@ const ordersService = {
       // 2. Decrement stock atomically
       await productModel.decrementVariantStock(variantId, collegeId, qty, trx);
 
-      // 3. Check for active membership to apply discount
-      const activeMembership = await membershipModel.getActiveMembership(userId, collegeId, trx);
-      const discountPercent = activeMembership
-        ? parseFloat(activeMembership.merch_discount_percent || 0)
-        : 0;
+      // 3. Check for active membership to apply discount (pick max profitable discount among active memberships)
+      const allActive = await membershipModel.getAllActiveMemberships(userId, collegeId, trx);
+      let discountPercent = 0;
+      if (allActive && allActive.length > 0) {
+        discountPercent = Math.max(
+          ...allActive.map((m) => parseFloat(m.merch_discount_percent || 0))
+        );
+      }
 
       const unitPrice = parseFloat(product.base_price);
       const rawTotal = unitPrice * qty;

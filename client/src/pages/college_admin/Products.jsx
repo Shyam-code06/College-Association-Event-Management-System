@@ -382,11 +382,10 @@ export const AdminProducts = () => {
                     key={sz}
                     type="button"
                     onClick={() => handleAddPresetSizeToProduct(sz)}
-                    className={`px-2 py-0.5 text-xs rounded transition-all cursor-pointer ${
-                      isAdded
+                    className={`px-2 py-0.5 text-xs rounded transition-all cursor-pointer ${isAdded
                         ? 'bg-primary-soft text-primary font-medium border border-primary/30'
                         : 'bg-surface border border-line text-ink hover:border-primary hover:text-primary'
-                    }`}
+                      }`}
                     title={isAdded ? `Size ${sz} is added` : `Add size ${sz}`}
                   >
                     {isAdded ? `✓ ${sz}` : `+ ${sz}`}
@@ -496,11 +495,10 @@ export const AdminProducts = () => {
                   key={sz}
                   type="button"
                   onClick={() => handleAddPresetSizeToVariantModal(sz)}
-                  className={`px-2 py-0.5 text-xs rounded transition-all cursor-pointer ${
-                    isSelected
+                  className={`px-2 py-0.5 text-xs rounded transition-all cursor-pointer ${isSelected
                       ? 'bg-primary-soft text-primary font-medium border border-primary/30'
                       : 'bg-surface border border-line text-ink hover:border-primary hover:text-primary'
-                  }`}
+                    }`}
                   title={alreadyInProduct ? `Size ${sz} already exists` : `Add size ${sz}`}
                 >
                   {alreadyInProduct ? `✓ ${sz} (in store)` : alreadyInRows ? `✓ ${sz}` : `+ ${sz}`}

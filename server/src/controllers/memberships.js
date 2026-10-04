@@ -57,6 +57,36 @@ const membershipsController = {
   deleteMembership: async (req, res) => {
     const result = await membershipsService.deleteMembership(req.params.id, req.collegeId);
     return sendSuccess(res, 200, 'Student membership deleted successfully', result);
+  },
+
+  requestCancellation: async (req, res) => {
+    const result = await membershipsService.requestCancellation(
+      req.params.id,
+      req.user.id,
+      req.collegeId,
+      req.body.reason
+    );
+    return sendSuccess(res, 200, 'Membership cancellation request submitted for administrative review', result);
+  },
+
+  reviewCancellation: async (req, res) => {
+    const result = await membershipsService.reviewCancellation(
+      req.params.id,
+      req.collegeId,
+      req.user,
+      req.body
+    );
+    return sendSuccess(
+      res,
+      200,
+      `Membership cancellation request ${req.body.action === 'approve' ? 'approved' : 'rejected'} successfully`,
+      result
+    );
+  },
+
+  getPlanMembers: async (req, res) => {
+    const result = await membershipsService.getPlanMembers(req.params.id, req.collegeId);
+    return sendSuccess(res, 200, 'Plan members retrieved successfully', result);
   }
 };
 

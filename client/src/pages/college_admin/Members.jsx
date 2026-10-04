@@ -13,7 +13,9 @@ import {
   Search,
   CheckSquare,
   Square,
-  Users
+  Users,
+  Clock,
+  AlertCircle,
 } from 'lucide-react';
 import { ResourceListPage } from '@/components/common/ResourceListPage';
 import { Badge } from '@/components/ui/Badge';
@@ -44,6 +46,41 @@ export const Members = () => {
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedOrgFilter, setSelectedOrgFilter] = useState('');
+  const [selectedPlanFilter, setSelectedPlanFilter] = useState('');
+  const [selectedCancelFilter, setSelectedCancelFilter] = useState('');
+  const [availablePlans, setAvailablePlans] = useState([]);
+
+  // Cancellation review state
+  const [reviewTarget, setReviewTarget] = useState(null);
+  const [reviewNote, setReviewNote] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  useEffect(() => {
+    membershipsApi
+      .getPlans()
+      .then((res) => {
+        setAvailablePlans(res.data || []);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleReviewCancellation = async (action) => {
+    if (!reviewTarget) return;
+    setIsSubmittingReview(true);
+    try {
+      await membershipsApi.reviewCancellation(reviewTarget.id, action, reviewNote);
+      toast.success(
+        `Cancellation request ${action === 'approve' ? 'approved' : 'rejected'} successfully.`
+      );
+      setReviewTarget(null);
+      setReviewNote('');
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      toast.error(err?.message || 'Failed to review cancellation request.');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
 
   // Verification modal
   const [verifyData, setVerifyData] = useState(null);
@@ -271,20 +308,56 @@ export const Members = () => {
       ),
     },
     {
+      key: 'created_at',
+      header: 'Joined Date',
+      render: (row) => <span className="text-xs text-muted">{formatDate(row.created_at)}</span>,
+    },
+    {
       key: 'expiry_date',
       header: 'Valid Until',
-      render: (row) => formatDate(row.expiry_date),
+      render: (row) => <span className="text-xs text-muted">{formatDate(row.expiry_date)}</span>,
     },
     {
       key: 'status',
       header: 'Status',
-      render: (row) => <Badge status={row.status || 'ACTIVE'} />,
+      render: (row) => {
+        if (row.cancellation_status === 'pending') {
+          return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/10 text-amber-700 border border-amber-500/20">
+              <Clock className="h-3 w-3" />
+              Cancel Requested
+            </span>
+          );
+        }
+        if (String(row.status).toLowerCase() === 'cancelled') {
+          return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/10 text-rose-700 border border-rose-500/20">
+              Cancelled
+            </span>
+          );
+        }
+        return <Badge status={row.status || 'ACTIVE'} />;
+      },
     },
     {
       key: 'actions',
       header: 'Actions',
       render: (row) => (
         <div className="flex items-center gap-2">
+          {row.cancellation_status === 'pending' && (
+            <Button
+              variant="primary"
+              size="sm"
+              className="text-xs bg-amber-600 hover:bg-amber-700 text-white h-7 px-2.5 font-medium"
+              onClick={() => {
+                setReviewTarget(row);
+                setReviewNote('');
+              }}
+            >
+              Review Cancel
+            </Button>
+          )}
+
           <Button
             variant="outline"
             size="sm"
@@ -307,23 +380,55 @@ export const Members = () => {
     },
   ];
 
-  const organizationFilter = (
-    <div className="flex items-center gap-1.5">
-      <Filter className="h-3.5 w-3.5 text-muted" />
+  const filterBar = (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-1.5">
+        <Filter className="h-3.5 w-3.5 text-muted" />
+        <select
+          value={selectedOrgFilter}
+          onChange={(e) => {
+            setSelectedOrgFilter(e.target.value);
+            setRefreshKey((k) => k + 1);
+          }}
+          className="text-xs bg-canvas border border-line rounded-md px-2.5 py-1.5 text-ink focus:outline-none focus:ring-1 focus:ring-primary"
+        >
+          <option value="">All Organizations</option>
+          <option value="Odoo Student Association">Odoo Student Association</option>
+          <option value="CSI">CSI</option>
+          <option value="IEEE Student Branch">IEEE Student Branch</option>
+          <option value="ACM Student Chapter">ACM Student Chapter</option>
+          <option value="GDSC">GDSC</option>
+        </select>
+      </div>
+
       <select
-        value={selectedOrgFilter}
+        value={selectedPlanFilter}
         onChange={(e) => {
-          setSelectedOrgFilter(e.target.value);
+          setSelectedPlanFilter(e.target.value);
           setRefreshKey((k) => k + 1);
         }}
         className="text-xs bg-canvas border border-line rounded-md px-2.5 py-1.5 text-ink focus:outline-none focus:ring-1 focus:ring-primary"
       >
-        <option value="">All Organizations</option>
-        <option value="Odoo Student Association">Odoo Student Association</option>
-        <option value="CSI">CSI</option>
-        <option value="IEEE Student Branch">IEEE Student Branch</option>
-        <option value="ACM Student Chapter">ACM Student Chapter</option>
-        <option value="GDSC">GDSC</option>
+        <option value="">All Membership Plans</option>
+        {availablePlans.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name} ({p.organization || 'Club'})
+          </option>
+        ))}
+      </select>
+
+      <select
+        value={selectedCancelFilter}
+        onChange={(e) => {
+          setSelectedCancelFilter(e.target.value);
+          setRefreshKey((k) => k + 1);
+        }}
+        className="text-xs bg-canvas border border-line rounded-md px-2.5 py-1.5 text-ink focus:outline-none focus:ring-1 focus:ring-primary"
+      >
+        <option value="">All Statuses</option>
+        <option value="pending">Pending Cancellation Requests</option>
+        <option value="approved">Approved Cancellations</option>
+        <option value="rejected">Rejected Cancellation Requests</option>
       </select>
     </div>
   );
@@ -331,9 +436,9 @@ export const Members = () => {
   return (
     <>
       <ResourceListPage
-        key={`${refreshKey}-${selectedOrgFilter}`}
+        key={`${refreshKey}-${selectedOrgFilter}-${selectedPlanFilter}-${selectedCancelFilter}`}
         title="Student Memberships"
-        subtitle="Manage student association passes, organization affiliations, and gate privileges"
+        subtitle="Manage student association passes, organization affiliations, and cancellation requests"
         breadcrumbs={[
           { label: 'Apps', href: '/apps' },
           {
@@ -345,6 +450,8 @@ export const Members = () => {
           membershipsApi.listMembers({
             ...params,
             organization: selectedOrgFilter || undefined,
+            planId: selectedPlanFilter || undefined,
+            cancellationStatus: selectedCancelFilter || undefined,
           })
         }
         columns={columns}
@@ -352,7 +459,7 @@ export const Members = () => {
         actionLabel="Add Membership"
         onAction={() => setIsAddModalOpen(true)}
         actionIcon={Plus}
-        filterComponent={organizationFilter}
+        filterComponent={filterBar}
         emptyTitle="No memberships found"
         emptyDescription="Add memberships for students across Odoo Student Association, CSI, IEEE, and more."
       />
@@ -609,6 +716,89 @@ export const Members = () => {
             Done
           </Button>
         </div>
+      </Modal>
+
+      {/* Review Cancellation Modal */}
+      <Modal
+        isOpen={Boolean(reviewTarget)}
+        onClose={() => setReviewTarget(null)}
+        title="Review Membership Cancellation Request"
+        maxWidth="max-w-md"
+      >
+        {reviewTarget && (
+          <div className="space-y-4">
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs space-y-1.5">
+              <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                <AlertCircle className="h-4 w-4 text-amber-700" />
+                Student Cancellation Request
+              </div>
+              <p className="text-muted">
+                Student:{' '}
+                <strong className="text-ink">
+                  {reviewTarget.student_name || reviewTarget.user_name}
+                </strong>{' '}
+                ({reviewTarget.student_email || reviewTarget.user_email})
+              </p>
+              <p className="text-muted">
+                Plan:{' '}
+                <strong className="text-ink">
+                  {reviewTarget.plan_name} ({reviewTarget.organization || 'Club'})
+                </strong>
+              </p>
+              <p className="text-muted">
+                Joined on: {formatDate(reviewTarget.created_at)}
+              </p>
+              {reviewTarget.cancellation_reason && (
+                <div className="mt-2 p-2 bg-white/70 dark:bg-black/20 rounded border border-amber-500/20 text-ink">
+                  <span className="font-semibold block text-[11px] text-muted">Reason provided:</span>
+                  &ldquo;{reviewTarget.cancellation_reason}&rdquo;
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-ink mb-1.5">
+                Review Note (Optional)
+              </label>
+              <textarea
+                value={reviewNote}
+                onChange={(e) => setReviewNote(e.target.value)}
+                placeholder="Reason or comments for approving or rejecting..."
+                rows={2}
+                className="w-full text-xs p-2.5 rounded-md border border-line bg-canvas text-ink focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-line">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setReviewTarget(null)}
+                disabled={isSubmittingReview}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-danger border-danger/30 hover:bg-danger/10"
+                onClick={() => handleReviewCancellation('reject')}
+                disabled={isSubmittingReview}
+              >
+                Reject Request
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                className="bg-danger hover:bg-danger/90 text-white"
+                onClick={() => handleReviewCancellation('approve')}
+                isLoading={isSubmittingReview}
+              >
+                Approve Cancellation
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </>
   );

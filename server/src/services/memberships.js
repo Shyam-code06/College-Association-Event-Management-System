@@ -182,6 +182,11 @@ const membershipsService = {
       if (disc > maxDiscountPercent) maxDiscountPercent = disc;
     });
 
+    // Sort active memberships so the highest discount (most profitable) membership is primary
+    activeMemberships.sort(
+      (a, b) => parseFloat(b.merch_discount_percent || 0) - parseFloat(a.merch_discount_percent || 0)
+    );
+
     const isCurrentlyActive = activeMemberships.length > 0;
     const primaryMembership = activeMemberships[0] || pendingMemberships[0] || allMemberships[0];
 
@@ -203,6 +208,7 @@ const membershipsService = {
       activeMemberships,
       pendingMemberships,
       maxDiscountPercent,
+      merch_discount_percent: isCurrentlyActive ? maxDiscountPercent : parseFloat(primaryMembership?.merch_discount_percent || 0),
       status: isCurrentlyActive ? 'ACTIVE' : (primaryMembership.status ? String(primaryMembership.status).toUpperCase() : 'PENDING'),
       rawStatus: primaryMembership.status,
       pendingPaymentId: pendingPayment ? pendingPayment.id : null,
@@ -219,6 +225,8 @@ const membershipsService = {
       status: queryParams.status,
       organization: queryParams.organization,
       search: queryParams.search,
+      planId: queryParams.planId ? Number(queryParams.planId) : undefined,
+      cancellationStatus: queryParams.cancellationStatus,
       offset,
       limit
     };
@@ -335,6 +343,99 @@ const membershipsService = {
         name: record.user_name,
         email: record.user_email
       }
+    };
+  },
+
+  /**
+   * Student requests membership cancellation within 5 days of joining.
+   */
+  requestCancellation: async (membershipId, userId, collegeId, reason) => {
+    const membership = await membershipModel.findById(membershipId, collegeId);
+    if (!membership || Number(membership.user_id) !== Number(userId)) {
+      throw new AppError('Membership record not found.', 404);
+    }
+
+    if (String(membership.status).toLowerCase() !== 'active') {
+      throw new AppError('Only active memberships can be cancelled.', 400);
+    }
+
+    // Check 5-day window from created_at or start_date
+    const joinedTime = new Date(membership.created_at || membership.start_date).getTime();
+    const now = Date.now();
+    const diffDays = (now - joinedTime) / (1000 * 60 * 60 * 24);
+    if (diffDays > 5) {
+      throw new AppError(
+        'Cancellation is only permitted within 5 days of joining membership. Your joining date was more than 5 days ago.',
+        400
+      );
+    }
+
+    if (membership.cancellation_status === 'pending') {
+      throw new AppError('A cancellation request for this membership is already pending review.', 400);
+    }
+
+    const updated = await membershipModel.updateMembership(membershipId, collegeId, {
+      cancellation_status: 'pending',
+      cancellation_reason: reason ? String(reason).trim() : 'Student requested cancellation within 5 days',
+      cancellation_requested_at: new Date()
+    });
+
+    return updated;
+  },
+
+  /**
+   * College Admin or Organizer reviews student membership cancellation request.
+   */
+  reviewCancellation: async (membershipId, collegeId, reviewerUser, { action, reviewNote }) => {
+    const membership = await membershipModel.findById(membershipId, collegeId);
+    if (!membership) {
+      throw new AppError('Membership record not found.', 404);
+    }
+
+    if (membership.cancellation_status !== 'pending') {
+      throw new AppError('No pending cancellation request found for this membership.', 400);
+    }
+
+    if (action === 'approve') {
+      const updated = await membershipModel.updateMembership(membershipId, collegeId, {
+        status: 'cancelled',
+        cancellation_status: 'approved',
+        cancellation_reviewed_by: reviewerUser.id,
+        cancellation_reviewed_at: new Date(),
+        cancellation_review_note: reviewNote ? String(reviewNote).trim() : 'Cancellation approved by administration'
+      });
+      return updated;
+    } else {
+      const updated = await membershipModel.updateMembership(membershipId, collegeId, {
+        status: 'active',
+        cancellation_status: 'rejected',
+        cancellation_reviewed_by: reviewerUser.id,
+        cancellation_reviewed_at: new Date(),
+        cancellation_review_note: reviewNote ? String(reviewNote).trim() : 'Cancellation request rejected'
+      });
+      return updated;
+    }
+  },
+
+  /**
+   * Organizer or College Admin retrieves all enrolled students for a particular membership plan.
+   */
+  getPlanMembers: async (planId, collegeId) => {
+    const plan = await membershipModel.findPlanById(planId, collegeId);
+    if (!plan) {
+      throw new AppError('Membership plan not found.', 404);
+    }
+
+    const members = await membershipModel.findAllMembers(collegeId, {
+      planId: Number(planId),
+      limit: 500,
+      offset: 0
+    });
+
+    return {
+      plan,
+      members,
+      totalCount: members.length
     };
   }
 };

@@ -199,7 +199,7 @@ const membershipModel = {
     return query.del();
   },
 
-  findAllMembers: async (collegeId, { status, search, organization, offset = 0, limit = 10 }, trx = db) => {
+  findAllMembers: async (collegeId, { status, search, organization, planId, cancellationStatus, offset = 0, limit = 10 }, trx = db) => {
     let query = trx('memberships')
       .select(
         'memberships.id',
@@ -211,12 +211,20 @@ const membershipModel = {
         'memberships.dues_status',
         'memberships.start_date',
         'memberships.expiry_date',
+        'memberships.cancellation_status',
+        'memberships.cancellation_reason',
+        'memberships.cancellation_requested_at',
+        'memberships.cancellation_reviewed_by',
+        'memberships.cancellation_reviewed_at',
+        'memberships.cancellation_review_note',
         'memberships.created_at',
         'users.name as user_name',
         'users.name as student_name',
         'users.email as user_email',
         'users.email as student_email',
-        'membership_plans.name as plan_name'
+        'membership_plans.name as plan_name',
+        'membership_plans.fee as plan_fee',
+        'membership_plans.merch_discount_percent'
       )
       .join('users', 'memberships.user_id', 'users.id')
       .join('membership_plans', 'memberships.plan_id', 'membership_plans.id');
@@ -225,6 +233,14 @@ const membershipModel = {
 
     if (status) {
       query = query.where('memberships.status', status);
+    }
+
+    if (planId) {
+      query = query.where('memberships.plan_id', planId);
+    }
+
+    if (cancellationStatus) {
+      query = query.where('memberships.cancellation_status', cancellationStatus);
     }
 
     if (organization) {
@@ -243,7 +259,7 @@ const membershipModel = {
     return query.orderBy('memberships.created_at', 'desc').offset(offset).limit(limit);
   },
 
-  countMembers: async (collegeId, { status, search, organization }, trx = db) => {
+  countMembers: async (collegeId, { status, search, organization, planId, cancellationStatus }, trx = db) => {
     let query = trx('memberships')
       .join('users', 'memberships.user_id', 'users.id')
       .join('membership_plans', 'memberships.plan_id', 'membership_plans.id');
@@ -252,6 +268,14 @@ const membershipModel = {
 
     if (status) {
       query = query.where('memberships.status', status);
+    }
+
+    if (planId) {
+      query = query.where('memberships.plan_id', planId);
+    }
+
+    if (cancellationStatus) {
+      query = query.where('memberships.cancellation_status', cancellationStatus);
     }
 
     if (organization) {

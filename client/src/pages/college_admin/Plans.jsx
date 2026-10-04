@@ -11,6 +11,10 @@ import {
   X,
   ShieldAlert,
   Building2,
+  Users,
+  Search,
+  AlertCircle,
+  ShieldCheck,
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -23,7 +27,7 @@ import { Badge } from '@/components/ui/Badge';
 import { membershipsApi } from '@/api/memberships';
 import { usersApi } from '@/api/users';
 import { useAuthStore } from '@/stores/auth';
-import { formatCurrency } from '@/utils/format';
+import { formatCurrency, formatDate } from '@/utils/format';
 
 export const Plans = () => {
   const { user } = useAuthStore();
@@ -46,6 +50,49 @@ export const Plans = () => {
   const [customEmailInput, setCustomEmailInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionInProgressId, setActionInProgressId] = useState(null);
+
+  // Enrolled Students modal & cancellation review state
+  const [viewingPlan, setViewingPlan] = useState(null);
+  const [planMembers, setPlanMembers] = useState([]);
+  const [isLoadingPlanMembers, setIsLoadingPlanMembers] = useState(false);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [cancellationTarget, setCancellationTarget] = useState(null);
+  const [reviewNote, setReviewNote] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  const handleOpenMembers = async (plan) => {
+    setViewingPlan(plan);
+    setMemberSearchQuery('');
+    setIsLoadingPlanMembers(true);
+    try {
+      const res = await membershipsApi.getPlanMembers(plan.id);
+      setPlanMembers(res.data?.members || []);
+    } catch (err) {
+      toast.error(err?.message || 'Failed to fetch enrolled students.');
+    } finally {
+      setIsLoadingPlanMembers(false);
+    }
+  };
+
+  const handleReviewCancellation = async (action) => {
+    if (!cancellationTarget) return;
+    setIsSubmittingReview(true);
+    try {
+      await membershipsApi.reviewCancellation(cancellationTarget.id, action, reviewNote);
+      toast.success(
+        `Cancellation request ${action === 'approve' ? 'approved' : 'rejected'} successfully.`
+      );
+      setCancellationTarget(null);
+      setReviewNote('');
+      if (viewingPlan) {
+        handleOpenMembers(viewingPlan);
+      }
+    } catch (err) {
+      toast.error(err?.message || 'Failed to review cancellation request.');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
 
   const fetchPlans = async () => {
     try {
@@ -392,7 +439,16 @@ export const Plans = () => {
                     </div>
                   )}
 
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-between items-center gap-2 pt-2 border-t border-line">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenMembers(plan)}
+                      icon={Users}
+                      className="text-xs"
+                    >
+                      Enrolled Students
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -616,6 +672,206 @@ export const Plans = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Enrolled Students for this Plan Modal */}
+      <Modal
+        isOpen={Boolean(viewingPlan)}
+        onClose={() => setViewingPlan(null)}
+        title={viewingPlan ? `Enrolled Students — ${viewingPlan.name}` : 'Enrolled Students'}
+        maxWidth="max-w-4xl"
+      >
+        {viewingPlan && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-surface rounded-lg border border-line">
+              <div className="text-xs space-y-0.5">
+                <span className="font-bold text-ink text-sm block">{viewingPlan.organization || 'Club'}</span>
+                <span className="text-muted">
+                  Fee: <strong className="text-primary">{formatCurrency(viewingPlan.fee)}</strong> • Duration:{' '}
+                  {viewingPlan.duration_months} Months • Merch Discount:{' '}
+                  <strong className="text-secondary">{viewingPlan.merch_discount_percent}% OFF</strong>
+                </span>
+              </div>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted" />
+                <input
+                  type="text"
+                  placeholder="Filter student name or email..."
+                  value={memberSearchQuery}
+                  onChange={(e) => setMemberSearchQuery(e.target.value)}
+                  className="w-full text-xs pl-8 pr-3 py-1.5 rounded-md border border-line bg-canvas text-ink focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+            </div>
+
+            {isLoadingPlanMembers ? (
+              <div className="py-12 text-center text-muted text-xs">Loading enrolled students...</div>
+            ) : (() => {
+              const q = memberSearchQuery.toLowerCase().trim();
+              const filtered = planMembers.filter(
+                (m) =>
+                  !q ||
+                  (m.student_name || m.user_name || '').toLowerCase().includes(q) ||
+                  (m.student_email || m.user_email || '').toLowerCase().includes(q)
+              );
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="py-12 text-center text-muted text-xs bg-canvas rounded-lg border border-line">
+                    {planMembers.length === 0
+                      ? 'No students have joined this membership plan yet.'
+                      : 'No students match your filter query.'}
+                  </div>
+                );
+              }
+
+              return (
+                <div className="overflow-x-auto max-h-96 rounded-lg border border-line">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-canvas border-b border-line text-muted font-semibold uppercase text-[11px]">
+                      <tr>
+                        <th className="py-2.5 px-3">Student Name & Email</th>
+                        <th className="py-2.5 px-3">Joined Date</th>
+                        <th className="py-2.5 px-3">Valid Until</th>
+                        <th className="py-2.5 px-3">Dues</th>
+                        <th className="py-2.5 px-3">Status</th>
+                        <th className="py-2.5 px-3 text-right">Cancellation / Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line bg-surface">
+                      {filtered.map((m) => {
+                        const name = m.student_name || m.user_name || 'Student';
+                        const email = m.student_email || m.user_email || '';
+                        return (
+                          <tr key={m.id} className="hover:bg-canvas/50 transition-colors">
+                            <td className="py-2.5 px-3">
+                              <div className="font-bold text-ink">{name}</div>
+                              <div className="text-[11px] text-muted">{email}</div>
+                            </td>
+                            <td className="py-2.5 px-3 text-muted">{formatDate(m.created_at)}</td>
+                            <td className="py-2.5 px-3 text-muted">{formatDate(m.expiry_date)}</td>
+                            <td className="py-2.5 px-3">
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  m.dues_status === 'paid'
+                                    ? 'bg-success/10 text-success'
+                                    : 'bg-amber-500/10 text-amber-700'
+                                }`}
+                              >
+                                {String(m.dues_status || 'unpaid').toUpperCase()}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <Badge status={m.status || 'ACTIVE'} />
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              {m.cancellation_status === 'pending' ? (
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  className="text-xs bg-amber-600 hover:bg-amber-700 text-white h-7 px-2.5"
+                                  onClick={() => {
+                                    setCancellationTarget(m);
+                                    setReviewNote('');
+                                  }}
+                                >
+                                  Review Cancel
+                                </Button>
+                              ) : m.cancellation_status === 'approved' ? (
+                                <span className="text-[11px] text-danger font-medium">Cancelled</span>
+                              ) : m.cancellation_status === 'rejected' ? (
+                                <span className="text-[11px] text-muted">Request Rejected</span>
+                              ) : (
+                                <span className="text-[11px] text-muted">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+
+            <div className="flex justify-end pt-2">
+              <Button variant="outline" size="sm" onClick={() => setViewingPlan(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Review Cancellation Request Modal */}
+      <Modal
+        isOpen={Boolean(cancellationTarget)}
+        onClose={() => setCancellationTarget(null)}
+        title="Review Membership Cancellation Request"
+        maxWidth="max-w-md"
+      >
+        {cancellationTarget && (
+          <div className="space-y-4">
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs space-y-1.5">
+              <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                <AlertCircle className="h-4 w-4 text-amber-700" />
+                Student Cancellation Request
+              </div>
+              <p className="text-muted">
+                <strong className="text-ink">
+                  {cancellationTarget.student_name || cancellationTarget.user_name}
+                </strong>{' '}
+                requested cancellation for <strong className="text-ink">{viewingPlan?.name}</strong>.
+              </p>
+              {cancellationTarget.cancellation_reason && (
+                <div className="mt-2 p-2 bg-white/70 dark:bg-black/20 rounded border border-amber-500/20 text-ink">
+                  <span className="font-semibold block text-[11px] text-muted">Student Reason:</span>
+                  &ldquo;{cancellationTarget.cancellation_reason}&rdquo;
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-ink mb-1.5">Review Note (Optional)</label>
+              <textarea
+                value={reviewNote}
+                onChange={(e) => setReviewNote(e.target.value)}
+                placeholder="Reason or feedback for approving or rejecting this request..."
+                rows={2}
+                className="w-full text-xs p-2.5 rounded-md border border-line bg-canvas text-ink focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-line">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCancellationTarget(null)}
+                disabled={isSubmittingReview}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-danger border-danger/30 hover:bg-danger/10"
+                onClick={() => handleReviewCancellation('reject')}
+                disabled={isSubmittingReview}
+              >
+                Reject Request
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                className="bg-danger hover:bg-danger/90 text-white"
+                onClick={() => handleReviewCancellation('approve')}
+                isLoading={isSubmittingReview}
+              >
+                Approve Cancellation
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

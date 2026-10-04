@@ -52,11 +52,22 @@ const listMembersSchema = Joi.object({
   limit: Joi.number().integer().min(1).max(100).default(10),
   status: Joi.string().valid(...Object.values(MEMBERSHIP_STATUS)),
   organization: Joi.string().trim().allow(''),
-  search: Joi.string().trim().allow('')
+  search: Joi.string().trim().allow(''),
+  planId: Joi.number().integer().positive(),
+  cancellationStatus: Joi.string().valid('none', 'pending', 'approved', 'rejected')
 });
 
 const verifyMemberSchema = Joi.object({
   identifier: Joi.string().trim().required()
+});
+
+const requestCancellationSchema = Joi.object({
+  reason: Joi.string().trim().max(500).allow('', null)
+});
+
+const reviewCancellationSchema = Joi.object({
+  action: Joi.string().valid('approve', 'reject').required(),
+  reviewNote: Joi.string().trim().max(500).allow('', null)
 });
 
 module.exports = {
@@ -66,5 +77,7 @@ module.exports = {
   joinMembershipSchema,
   adminCreateMembershipSchema,
   listMembersSchema,
-  verifyMemberSchema
+  verifyMemberSchema,
+  requestCancellationSchema,
+  reviewCancellationSchema
 };

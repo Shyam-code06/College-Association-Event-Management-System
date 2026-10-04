@@ -13,7 +13,9 @@ const {
   joinMembershipSchema,
   adminCreateMembershipSchema,
   listMembersSchema,
-  verifyMemberSchema
+  verifyMemberSchema,
+  requestCancellationSchema,
+  reviewCancellationSchema
 } = require('../validations/memberships');
 
 const router = express.Router();
@@ -64,6 +66,29 @@ router.get(
   '/me',
   authorize(ROLES.STUDENT),
   asyncHandler(membershipsController.getMyMembership)
+);
+
+// Student: request cancellation within 5 days
+router.post(
+  '/:id/cancel-request',
+  authorize(ROLES.STUDENT),
+  validate(requestCancellationSchema),
+  asyncHandler(membershipsController.requestCancellation)
+);
+
+// College Admin & Organizer: review student cancellation request
+router.patch(
+  '/:id/review-cancellation',
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
+  validate(reviewCancellationSchema),
+  asyncHandler(membershipsController.reviewCancellation)
+);
+
+// College Admin & Organizer: list enrolled students for a specific plan
+router.get(
+  '/plans/:id/members',
+  authorize(ROLES.COLLEGE_ADMIN, ROLES.ORGANIZER),
+  asyncHandler(membershipsController.getPlanMembers)
 );
 
 // College Admin & Organizer: list members

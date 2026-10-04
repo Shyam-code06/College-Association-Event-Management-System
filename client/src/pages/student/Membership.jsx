@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { Award, CheckCircle2, CreditCard, Plus, ArrowRight, Sparkles, Building2, Check, ShieldCheck } from 'lucide-react';
+import { Award, CheckCircle2, CreditCard, Plus, ArrowRight, Sparkles, Building2, Check, ShieldCheck, Clock, AlertCircle, XCircle } from 'lucide-react';
 import { Wizard } from '@/components/ui/Wizard';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 import { createWizardStore } from '@/stores/wizard';
 import { membershipsApi } from '@/api/memberships';
 import { paymentsApi } from '@/api/payments';
@@ -215,6 +216,27 @@ export const Membership = () => {
   const maxDiscountPercent = useMemo(() => {
     return Number(membershipData?.maxDiscountPercent || 0);
   }, [membershipData]);
+
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
+
+  const handleSubmitCancellation = async (e) => {
+    e.preventDefault();
+    if (!cancelTarget) return;
+    setIsSubmittingCancel(true);
+    try {
+      await membershipsApi.requestCancellation(cancelTarget.id, cancelReason);
+      toast.success('Cancellation request submitted successfully. Awaiting organization/admin review.');
+      setCancelTarget(null);
+      setCancelReason('');
+      await fetchMembership();
+    } catch (err) {
+      toast.error(err?.message || 'Failed to submit cancellation request.');
+    } finally {
+      setIsSubmittingCancel(false);
+    }
+  };
 
   const handleCompletePendingPayment = async (membershipId) => {
     setIsProcessingPayment(true);
@@ -447,6 +469,73 @@ export const Membership = () => {
                     <span className="font-bold text-primary">Member Rate</span>
                   </div>
                 </div>
+
+                {/* 5-Day Cancellation Workflow */}
+                {(() => {
+                  const joinedDate = new Date(mem.created_at || mem.start_date || Date.now());
+                  const diffDays = Math.floor((Date.now() - joinedDate.getTime()) / (1000 * 60 * 60 * 24));
+                  const isEligible = diffDays <= 5;
+                  const daysRemaining = Math.max(0, 5 - diffDays);
+
+                  if (mem.cancellation_status === 'pending') {
+                    return (
+                      <div className="mt-4 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs">
+                        <div className="flex items-center gap-1.5 font-bold text-amber-700">
+                          <Clock className="h-3.5 w-3.5" />
+                          <span>Cancellation Pending Approval</span>
+                        </div>
+                        {mem.cancellation_reason && (
+                          <p className="text-[11px] text-muted mt-1 italic line-clamp-2">
+                            &ldquo;{mem.cancellation_reason}&rdquo;
+                          </p>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  if (mem.cancellation_status === 'rejected') {
+                    return (
+                      <div className="mt-4 p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs">
+                        <div className="flex items-center gap-1.5 font-bold text-rose-700">
+                          <XCircle className="h-3.5 w-3.5" />
+                          <span>Cancellation Request Rejected</span>
+                        </div>
+                        {mem.cancellation_review_note && (
+                          <p className="text-[11px] text-muted mt-0.5">
+                            Note: {mem.cancellation_review_note}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  if (isEligible) {
+                    return (
+                      <div className="mt-4 pt-3 border-t border-line flex items-center justify-between text-xs">
+                        <span className="text-[11px] text-muted">
+                          5-day cancel policy: <strong className="text-ink">{daysRemaining}d left</strong>
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-danger hover:bg-danger/10 hover:text-danger h-7 px-2 font-medium"
+                          onClick={() => {
+                            setCancelTarget(mem);
+                            setCancelReason('');
+                          }}
+                        >
+                          Cancel Pass
+                        </Button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="mt-4 pt-2 border-t border-line text-[11px] text-muted text-right">
+                      5-day cancellation window closed
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>
@@ -494,6 +583,64 @@ export const Membership = () => {
           />
         </div>
       )}
+
+      {/* Cancellation Request Modal */}
+      <Modal
+        isOpen={Boolean(cancelTarget)}
+        onClose={() => setCancelTarget(null)}
+        title="Request Membership Cancellation"
+        maxWidth="max-w-md"
+      >
+        {cancelTarget && (
+          <form onSubmit={handleSubmitCancellation} className="space-y-4">
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                <AlertCircle className="h-4 w-4" />
+                5-Day Grace Period Policy
+              </div>
+              <p className="text-muted leading-relaxed">
+                You joined <strong className="text-ink">{cancelTarget.plan_name}</strong> on{' '}
+                {formatDate(cancelTarget.created_at || cancelTarget.start_date)}. Cancellation requests are
+                reviewed and approved by the club organization or college admin.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-ink mb-1.5">
+                Reason for Cancellation (Optional)
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Explain why you want to cancel this club membership pass..."
+                rows={3}
+                className="w-full text-xs p-2.5 rounded-md border border-line bg-canvas text-ink focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => setCancelTarget(null)}
+                disabled={isSubmittingCancel}
+              >
+                Keep Membership
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                type="submit"
+                className="bg-danger hover:bg-danger/90 text-white"
+                isLoading={isSubmittingCancel}
+              >
+                Confirm Request
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 };
