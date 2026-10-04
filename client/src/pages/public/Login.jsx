@@ -54,17 +54,31 @@ export const Login = () => {
       navigate(destination, { replace: true });
     } catch (err) {
       const msg = err?.message || 'Login failed. Please check your credentials.';
-      if (
+      const isPending =
         msg.toLowerCase().includes('approval') ||
-        msg.toLowerCase().includes('deactivated') ||
-        msg.toLowerCase().includes('pending')
-      ) {
+        msg.toLowerCase().includes('college admin') ||
+        msg.toLowerCase().includes('your data has been sent') ||
+        msg.toLowerCase().includes('pending');
+
+      if (isPending) {
+        const approvalMsg =
+          'Your data has been sent to your College Admin. After approval, you can access your dashboard.';
         setApprovalNotice({
           email: data.email,
-          message: msg,
+          message: approvalMsg,
         });
+        toast.error(approvalMsg, {
+          duration: 6000,
+        });
+      } else {
+        if (msg.toLowerCase().includes('deactivated')) {
+          setApprovalNotice({
+            email: data.email,
+            message: msg,
+          });
+        }
+        toast.error(msg);
       }
-      toast.error(msg);
     } finally {
       setIsLoading(false);
     }

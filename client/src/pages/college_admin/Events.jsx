@@ -33,10 +33,22 @@ export const AdminEvents = () => {
   const columns = [
     {
       key: 'title',
-      header: 'Event Name',
+      header: 'Event & Organization',
       render: (row) => (
         <div>
-          <span className="font-bold text-ink">{row.name || row.title}</span>
+          <span className="font-bold text-ink block">{row.name || row.title}</span>
+          {(row.creator_name || row.creator_email) && (
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-xs font-semibold text-primary">
+                {row.creator_name || 'Organization'}
+              </span>
+              {row.creator_email && (
+                <span className="text-[11px] text-muted font-mono">
+                  ({row.creator_email})
+                </span>
+              )}
+            </div>
+          )}
           <span className="block text-xs text-muted truncate max-w-xs">{row.location || row.venue}</span>
         </div>
       ),

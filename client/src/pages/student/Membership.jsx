@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { Award, CheckCircle2, CreditCard } from 'lucide-react';
+import { Award, CheckCircle2, CreditCard, Plus, ArrowRight, Sparkles, Building2, Check, ShieldCheck } from 'lucide-react';
 import { Wizard } from '@/components/ui/Wizard';
 import { Button } from '@/components/ui/Button';
 import { createWizardStore } from '@/stores/wizard';
@@ -17,6 +17,9 @@ const planSchema = z.object({
 
 const ChoosePlanStep = ({ formData, updateFormData, errors }) => {
   const [plans, setPlans] = useState([]);
+  const activePlanIds = useMemo(() => {
+    return (formData.activeMemberships || []).map((m) => m.plan_id);
+  }, [formData.activeMemberships]);
 
   useEffect(() => {
     membershipsApi
@@ -24,17 +27,21 @@ const ChoosePlanStep = ({ formData, updateFormData, errors }) => {
       .then((res) => {
         const list = res.data || [];
         setPlans(list);
-        if (list.length > 0 && !formData.planId) {
+
+        // Pre-select first unjoined plan if available
+        const unjoined = list.find((p) => !activePlanIds.includes(p.id));
+        if (unjoined && !formData.planId) {
           updateFormData({
-            planId: String(list[0].id),
-            selectedPlan: list[0],
+            planId: String(unjoined.id),
+            selectedPlan: unjoined,
           });
         }
       })
       .catch((err) => console.error('Failed to load plans', err));
-  }, []);
+  }, [activePlanIds, formData.planId, updateFormData]);
 
   const handleSelect = (plan) => {
+    if (activePlanIds.includes(plan.id)) return;
     updateFormData({
       planId: String(plan.id),
       selectedPlan: plan,
@@ -49,15 +56,18 @@ const ChoosePlanStep = ({ formData, updateFormData, errors }) => {
 
       <div className="grid grid-cols-1 gap-3">
         {plans.map((plan) => {
+          const isAlreadyJoined = activePlanIds.includes(plan.id);
           const isSelected = String(formData.planId) === String(plan.id);
           return (
             <div
               key={plan.id}
               onClick={() => handleSelect(plan)}
-              className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                isSelected
-                  ? 'border-primary bg-primary-soft/30 shadow-soft'
-                  : 'border-line hover:border-line/80 bg-surface'
+              className={`p-4 rounded-lg border-2 transition-all ${
+                isAlreadyJoined
+                  ? 'border-success/30 bg-success/5 opacity-80 cursor-not-allowed'
+                  : isSelected
+                  ? 'border-primary bg-primary-soft/30 shadow-soft cursor-pointer'
+                  : 'border-line hover:border-line/80 bg-surface cursor-pointer'
               }`}
             >
               <div className="flex items-center justify-between">
@@ -67,6 +77,11 @@ const ChoosePlanStep = ({ formData, updateFormData, errors }) => {
                     {plan.organization && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-primary/10 text-primary border border-primary/20">
                         {plan.organization}
+                      </span>
+                    )}
+                    {isAlreadyJoined && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-success/20 text-success border border-success/30 inline-flex items-center gap-1">
+                        <Check className="h-3 w-3" /> Already Active
                       </span>
                     )}
                   </div>
@@ -106,7 +121,7 @@ const ReviewPlanStep = ({ formData }) => {
         </div>
         {plan.organization && (
           <div className="flex justify-between py-1 border-b border-line">
-            <span className="text-muted">Organization</span>
+            <span className="text-muted">Organization / Club</span>
             <span className="font-semibold text-primary">{plan.organization}</span>
           </div>
         )}
@@ -130,14 +145,14 @@ const ReviewPlanStep = ({ formData }) => {
         </div>
       </div>
       <p className="text-xs text-muted text-center">
-        Association passes are non-refundable and tied to your student ID.
+        Association passes are non-refundable and tied to your student account.
       </p>
     </div>
   );
 };
 
 // Step 3: Payment Step
-const PaymentStep = ({ formData, _updateFormData }) => {
+const PaymentStep = ({ formData }) => {
   return (
     <div className="space-y-4 text-center py-2">
       <div className="h-12 w-12 rounded-pill bg-primary-soft text-primary flex items-center justify-center mx-auto mb-2">
@@ -162,23 +177,24 @@ const DoneStep = () => (
     </div>
     <h3 className="text-xl font-bold text-ink mb-1">Membership Activated!</h3>
     <p className="text-sm text-muted max-w-sm mx-auto">
-      You are now an official association member. Member discounts will be automatically applied to your events and store purchases.
+      You are now an active member of this organization. Member discounts will be automatically applied to your events and store purchases.
     </p>
   </div>
 );
 
 export const Membership = () => {
   const navigate = useNavigate();
-  const [currentMembership, setCurrentMembership] = useState(null);
+  const [membershipData, setMembershipData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isJoiningNew, setIsJoiningNew] = useState(false);
 
   const fetchMembership = async () => {
     try {
       const res = await membershipsApi.getMyMembership();
-      setCurrentMembership(res.data);
+      setMembershipData(res.data);
     } catch {
-      setCurrentMembership(null);
+      setMembershipData(null);
     } finally {
       setLoading(false);
     }
@@ -188,20 +204,28 @@ export const Membership = () => {
     fetchMembership();
   }, []);
 
-  const handleCompletePendingPayment = async () => {
+  const activeMemberships = useMemo(() => {
+    return membershipData?.activeMemberships || [];
+  }, [membershipData]);
+
+  const pendingMemberships = useMemo(() => {
+    return membershipData?.pendingMemberships || [];
+  }, [membershipData]);
+
+  const maxDiscountPercent = useMemo(() => {
+    return Number(membershipData?.maxDiscountPercent || 0);
+  }, [membershipData]);
+
+  const handleCompletePendingPayment = async (membershipId) => {
     setIsProcessingPayment(true);
     try {
-      let paymentId = currentMembership?.pendingPaymentId;
-      if (!paymentId) {
-        const pendingRes = await paymentsApi.getPending();
-        const found = (pendingRes.data || []).find(
-          (p) => p.payable_type === 'membership' && p.payable_id === currentMembership?.id
-        );
-        paymentId = found ? found.id : null;
-      }
+      const pendingRes = await paymentsApi.getPending();
+      const found = (pendingRes.data || []).find(
+        (p) => p.payable_type === 'membership' && p.payable_id === membershipId
+      );
 
-      if (paymentId) {
-        await paymentsApi.process(paymentId, true);
+      if (found) {
+        await paymentsApi.process(found.id, true);
         toast.success('Membership payment completed successfully!');
         await fetchMembership();
       } else {
@@ -219,8 +243,9 @@ export const Membership = () => {
       createWizardStore({
         planId: '',
         selectedPlan: null,
+        activeMemberships: activeMemberships,
       }),
-    []
+    [activeMemberships]
   );
 
   const steps = [
@@ -257,12 +282,12 @@ export const Membership = () => {
         planId: Number(formData.planId),
       });
 
-      // If a payment is created or required, auto-process it
       const paymentId = res.data?.paymentId || res.data?.payment?.id;
       if (paymentId) {
         await paymentsApi.process(paymentId, true);
       }
       toast.success('Membership joined and activated successfully!');
+      setIsJoiningNew(false);
       await fetchMembership();
     } catch (err) {
       toast.error(err?.message || 'Failed to activate membership.');
@@ -270,104 +295,205 @@ export const Membership = () => {
     }
   };
 
-  const isMembershipActive = Boolean(
-    currentMembership?.isActive ||
-    String(currentMembership?.status).toUpperCase() === 'ACTIVE'
-  );
-
-  if (!loading && isMembershipActive) {
+  if (loading) {
     return (
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="bg-surface border border-line rounded-lg p-8 shadow-card text-center space-y-6">
-          <div className="h-16 w-16 rounded-pill bg-primary-soft text-primary flex items-center justify-center mx-auto">
-            <Award className="h-8 w-8" />
-          </div>
+      <div className="max-w-3xl mx-auto px-4 py-16 text-center text-muted text-sm">
+        Loading membership information...
+      </div>
+    );
+  }
 
-          <div>
-            <span className="inline-block px-3 py-1 rounded-pill bg-success/10 text-success text-xs font-bold uppercase mb-2">
-              Active Member
-            </span>
-            <h1 className="text-2xl font-bold text-ink">
-              {currentMembership.organization ? `${currentMembership.organization} - ` : ''}
-              {currentMembership.plan_name || 'Student Association Member'}
-            </h1>
-            <p className="text-xs text-muted mt-1">
-              Member ID: {currentMembership.id} • Expires: {formatDate(currentMembership.expiry_date)}
-            </p>
-          </div>
+  // Active student memberships dashboard
+  return (
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-ink flex items-center gap-2">
+            <Award className="h-6 w-6 text-primary" />
+            Club & Association Memberships
+          </h1>
+          <p className="text-xs sm:text-sm text-muted mt-1">
+            Join and manage multiple society memberships to unlock discounted tickets and merchandise.
+          </p>
+        </div>
 
-          <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto text-left">
-            <div className="p-3 bg-canvas rounded-md border border-line">
-              <span className="text-[11px] text-muted block">Store Discount</span>
-              <span className="text-base font-bold text-primary">
-                {currentMembership.merch_discount_percent || 10}% OFF
+        {activeMemberships.length > 0 && !isJoiningNew && (
+          <Button
+            variant="primary"
+            icon={Plus}
+            onClick={() => setIsJoiningNew(true)}
+          >
+            + Join Another Club
+          </Button>
+        )}
+      </div>
+
+      {/* KPI Perks Banner for Active Members */}
+      {activeMemberships.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 bg-surface border border-line rounded-xl shadow-soft flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <Award className="h-5 w-5" />
+            </div>
+            <div>
+              <span className="text-[11px] text-muted uppercase font-bold block">Active Clubs</span>
+              <span className="text-lg font-extrabold text-ink">
+                {activeMemberships.length} Active {activeMemberships.length === 1 ? 'Club' : 'Clubs'}
               </span>
             </div>
-            <div className="p-3 bg-canvas rounded-md border border-line">
-              <span className="text-[11px] text-muted block">Event Pricing</span>
-              <span className="text-base font-bold text-secondary">
-                Member Rate
+          </div>
+
+          <div className="p-4 bg-surface border border-line rounded-xl shadow-soft flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center shrink-0">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <span className="text-[11px] text-muted uppercase font-bold block">Store Discount</span>
+              <span className="text-lg font-extrabold text-secondary">
+                {maxDiscountPercent}% Maximum OFF
               </span>
             </div>
           </div>
 
-          <div className="pt-4 flex justify-center gap-3">
-            <Button variant="outline" onClick={() => navigate('/events')}>
+          <div className="p-4 bg-surface border border-line rounded-xl shadow-soft flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-success/10 text-success flex items-center justify-center shrink-0">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <span className="text-[11px] text-muted uppercase font-bold block">Event Pricing</span>
+              <span className="text-lg font-extrabold text-success">
+                Member Rates Active
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Membership Dues Section */}
+      {pendingMemberships.length > 0 && (
+        <div className="p-5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-3">
+          <div className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-amber-600" />
+            <h3 className="font-bold text-sm text-ink">Pending Membership Payments</h3>
+          </div>
+          <div className="space-y-2">
+            {pendingMemberships.map((pm) => (
+              <div
+                key={pm.id}
+                className="flex items-center justify-between p-3 bg-surface rounded-lg border border-amber-500/20 text-xs"
+              >
+                <div>
+                  <span className="font-bold text-ink">{pm.plan_name}</span>
+                  {pm.organization && (
+                    <span className="text-muted ml-2">({pm.organization})</span>
+                  )}
+                  <span className="block text-muted text-[11px] mt-0.5">
+                    Amount Due: {formatCurrency(pm.plan_fee || 0)}
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  isLoading={isProcessingPayment}
+                  onClick={() => handleCompletePendingPayment(pm.id)}
+                >
+                  Complete Payment
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Active Memberships Grid */}
+      {activeMemberships.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-bold text-ink uppercase tracking-wider">
+            Your Active Memberships ({activeMemberships.length})
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {activeMemberships.map((mem) => (
+              <div
+                key={mem.id}
+                className="p-5 bg-surface border border-line rounded-xl shadow-soft flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className="inline-block px-2.5 py-0.5 rounded-full bg-success/10 text-success text-[11px] font-bold">
+                      ✓ Active Pass
+                    </span>
+                    {mem.organization && (
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
+                        {mem.organization}
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="font-bold text-base text-ink">{mem.plan_name}</h3>
+                  <p className="text-xs text-muted mt-1">
+                    Pass ID: #{mem.id} • Valid until {formatDate(mem.expiry_date)}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-line text-xs">
+                  <div>
+                    <span className="text-muted text-[11px] block">Merch Discount:</span>
+                    <span className="font-bold text-secondary">
+                      {mem.merch_discount_percent || 10}% OFF
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted text-[11px] block">Event Pricing:</span>
+                    <span className="font-bold text-primary">Member Rate</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" size="sm" onClick={() => navigate('/events')}>
               Browse Discounted Events
             </Button>
-            <Button variant="primary" onClick={() => navigate('/student/store')}>
-              Shop Merch
+            <Button variant="outline" size="sm" onClick={() => navigate('/student/store')}>
+              Shop Merch with Member Discount
             </Button>
           </div>
         </div>
-      </div>
-    );
-  }
+      )}
 
-  if (!loading && currentMembership && (currentMembership.status === 'PENDING' || currentMembership.dues_status === 'unpaid')) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="bg-surface border border-line rounded-lg p-8 shadow-card text-center space-y-6">
-          <div className="h-16 w-16 rounded-pill bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
-            <CreditCard className="h-8 w-8" />
+      {/* Join New Membership Wizard: Shown if no active memberships OR when user clicks "+ Join Another Club" */}
+      {(activeMemberships.length === 0 || isJoiningNew) && (
+        <div className="bg-surface border border-line rounded-2xl p-6 sm:p-8 shadow-card">
+          <div className="flex items-center justify-between pb-4 border-b border-line mb-6">
+            <div>
+              <h2 className="text-lg font-bold text-ink">
+                {activeMemberships.length > 0 ? 'Join Another Club Membership' : 'Join a Student Club Membership'}
+              </h2>
+              <p className="text-xs text-muted mt-0.5">
+                Select from affiliated campus organizations to unlock discounts
+              </p>
+            </div>
+            {activeMemberships.length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => setIsJoiningNew(false)}>
+                Cancel
+              </Button>
+            )}
           </div>
 
-          <div>
-            <span className="inline-block px-3 py-1 rounded-pill bg-amber-500/10 text-amber-600 text-xs font-bold uppercase mb-2">
-              Payment Pending
-            </span>
-            <h1 className="text-2xl font-bold text-ink">
-              {currentMembership.plan_name || 'Membership'} (Pending Confirmation)
-            </h1>
-            <p className="text-xs text-muted mt-1">
-              You have already joined this membership plan. Please complete the pending dues payment to activate all your member benefits.
-            </p>
-          </div>
-
-          <div className="pt-4 flex justify-center gap-3">
-            <Button
-              variant="primary"
-              onClick={handleCompletePendingPayment}
-              isLoading={isProcessingPayment}
-            >
-              Complete Payment Now
-            </Button>
-          </div>
+          <Wizard
+            steps={steps}
+            store={wizardStore}
+            onSubmit={handleSubmit}
+            onDone={() => {
+              setIsJoiningNew(false);
+              fetchMembership();
+            }}
+            confirmButtonText="Pay & Join Membership"
+            doneButtonText="View My Memberships"
+          />
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="py-10">
-      <Wizard
-        steps={steps}
-        store={wizardStore}
-        onSubmit={handleSubmit}
-        onDone={() => navigate('/student/dashboard')}
-        confirmButtonText="Pay & Join Association"
-        doneButtonText="Go to Dashboard"
-      />
+      )}
     </div>
   );
 };

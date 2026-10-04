@@ -58,14 +58,6 @@ export const APP_NAVIGATION = {
       icon: GraduationCap,
     },
     {
-      id: 'members',
-      title: 'Memberships',
-      description: 'Active student memberships and renewals',
-      path: '/admin/members',
-      icon: UserCheck,
-    },
-
-    {
       id: 'plans',
       title: 'Member Plans',
       description: 'Configure student association tiers & pricing',
@@ -193,13 +185,6 @@ export const APP_NAVIGATION = {
       description: 'Create & manage association membership plans for your club',
       path: '/organizer/plans',
       icon: Award,
-    },
-    {
-      id: 'members',
-      title: 'Members Directory',
-      description: 'View and grant association memberships for enrolled students',
-      path: '/organizer/members',
-      icon: Users,
     },
     {
       id: 'announcements',

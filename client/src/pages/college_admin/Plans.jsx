@@ -18,6 +18,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Modal } from '@/components/ui/Modal';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { membershipsApi } from '@/api/memberships';
 import { usersApi } from '@/api/users';
@@ -81,7 +82,9 @@ export const Plans = () => {
   const openCreate = () => {
     setEditingPlan(null);
     setName('');
-    const defaultOrg = !isCollegeAdmin ? getOrganizerSociety(user) : 'Odoo Student Association';
+    const defaultOrg = !isCollegeAdmin
+      ? getOrganizerSociety(user)
+      : (organizers.length > 0 ? organizers[0].name : 'Odoo Student Association');
     setOrganization(defaultOrg);
     setFee('');
     setDurationMonths('12');
@@ -89,6 +92,8 @@ export const Plans = () => {
     setTicketDiscountNote('Free or discounted admission to organization events');
     if (!isCollegeAdmin && user?.email) {
       setAssignedOrganizers([user.email.toLowerCase().trim()]);
+    } else if (isCollegeAdmin && organizers.length > 0) {
+      setAssignedOrganizers([organizers[0].email.toLowerCase().trim()]);
     } else {
       setAssignedOrganizers([]);
     }
@@ -427,25 +432,53 @@ export const Plans = () => {
             />
           </FormField>
 
-          <FormField
-            label="Organization Chapter"
-            required
-            hint={
-              isCollegeAdmin
-                ? 'Club or association granting this membership (e.g. CSI, IEEE, Odoo)'
-                : 'Locked to your official student organization chapter'
-            }
-          >
-            <Input
-              placeholder="e.g. CSI Student Chapter"
-              value={!isCollegeAdmin ? getOrganizerSociety(user) : organization}
-              onChange={(e) => setOrganization(e.target.value)}
-              disabled={!isCollegeAdmin}
-              readOnly={!isCollegeAdmin}
-              className={!isCollegeAdmin ? 'bg-canvas text-muted cursor-not-allowed select-none' : ''}
+          {isCollegeAdmin ? (
+            <FormField
+              label="Select Organization / Club"
               required
-            />
-          </FormField>
+              hint="Select the organization/club created by your college"
+            >
+              {organizers.length > 0 ? (
+                <Select
+                  value={organization}
+                  onChange={(e) => {
+                    const selectedVal = e.target.value;
+                    setOrganization(selectedVal);
+                    const matched = organizers.find(
+                      (o) => o.name === selectedVal || o.email === selectedVal
+                    );
+                    if (matched && matched.email) {
+                      const em = matched.email.toLowerCase().trim();
+                      if (!assignedOrganizers.includes(em)) {
+                        setAssignedOrganizers((prev) => [...prev, em]);
+                      }
+                    }
+                  }}
+                  required
+                >
+                  <option value="">-- Select Organization Created by Admin --</option>
+                  {organizers.map((org) => (
+                    <option key={org.id} value={org.name}>
+                      {org.name} ({org.email})
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <div className="text-xs text-amber-700 bg-amber-500/10 border border-amber-500/30 rounded-md p-2.5">
+                  No organizers found. Please create an organizer first in Organizers.
+                </div>
+              )}
+            </FormField>
+          ) : (
+            <FormField label="Organization Chapter" required>
+              <Input
+                value={getOrganizerSociety(user)}
+                disabled
+                readOnly
+                className="bg-canvas text-muted cursor-not-allowed select-none"
+              />
+            </FormField>
+          )}
 
           {/* Organizer Email Assignment (Multi-Select Allowed): Only for College Admin */}
           {isCollegeAdmin && (

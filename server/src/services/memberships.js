@@ -91,16 +91,15 @@ const membershipsService = {
         throw new AppError('Membership plan is invalid or inactive', 400);
       }
 
-      // 2. Check if student already has a membership
-      const existingMem = await membershipModel.findByUserId(userId, collegeId, trx);
-      if (existingMem) {
-        if (existingMem.status === MEMBERSHIP_STATUS.ACTIVE) {
-          throw new AppError('You already have an active membership with Skyline. You cannot join a second time.', 400);
+      // 2. Check if student already has a membership for THIS specific plan
+      const existingPlanMem = await membershipModel.findByUserIdAndPlan(userId, plan.id, collegeId, trx);
+      if (existingPlanMem) {
+        if (String(existingPlanMem.status).toLowerCase() === 'active') {
+          throw new AppError(`You already have an active membership for "${plan.name}".`, 400);
         }
-        if (existingMem.status === MEMBERSHIP_STATUS.PENDING) {
-          throw new AppError('You already have a pending membership request. Please complete your existing payment instead of joining again.', 400);
+        if (String(existingPlanMem.status).toLowerCase() === 'pending') {
+          throw new AppError(`You already have a pending membership request for "${plan.name}". Please complete your payment.`, 400);
         }
-        throw new AppError('You have already joined a membership with Skyline.', 400);
       }
 
       const fee = parseFloat(plan.fee);
@@ -158,37 +157,56 @@ const membershipsService = {
   },
 
   /**
-   * Student retrieves own membership status.
+   * Student retrieves own membership status and list of all memberships.
    */
   getMyMembership: async (userId, collegeId) => {
-    const membership = await membershipModel.findByUserId(userId, collegeId);
-    if (!membership) {
-      return { hasMembership: false, isActive: false, membership: null };
+    const allMemberships = await membershipModel.findAllByUserId(userId, collegeId);
+    if (!allMemberships || allMemberships.length === 0) {
+      return { hasMembership: false, isActive: false, memberships: [], activeMemberships: [], membership: null };
     }
 
     const today = new Date().toISOString().split('T')[0];
-    const isCurrentlyActive =
-      String(membership.status).toLowerCase() === 'active' &&
-      String(membership.dues_status).toLowerCase() === 'paid' &&
-      (!membership.expiry_date || membership.expiry_date >= today);
+    const activeMemberships = allMemberships.filter((m) =>
+      String(m.status).toLowerCase() === 'active' &&
+      String(m.dues_status).toLowerCase() === 'paid' &&
+      (!m.expiry_date || m.expiry_date >= today)
+    );
+
+    const pendingMemberships = allMemberships.filter((m) =>
+      String(m.status).toLowerCase() === 'pending' || String(m.dues_status).toLowerCase() === 'unpaid'
+    );
+
+    let maxDiscountPercent = 0;
+    activeMemberships.forEach((m) => {
+      const disc = parseFloat(m.merch_discount_percent || 0);
+      if (disc > maxDiscountPercent) maxDiscountPercent = disc;
+    });
+
+    const isCurrentlyActive = activeMemberships.length > 0;
+    const primaryMembership = activeMemberships[0] || pendingMemberships[0] || allMemberships[0];
 
     let pendingPayment = null;
-    if (String(membership.status).toLowerCase() === 'pending') {
+    if (primaryMembership && String(primaryMembership.status).toLowerCase() === 'pending') {
       pendingPayment = await paymentModel.findByPayable(
         PAYABLE_TYPE.MEMBERSHIP,
-        membership.id,
+        primaryMembership.id,
         collegeId
       );
     }
 
     return {
-      ...membership,
-      hasMembership: true,
+      ...primaryMembership,
+      hasMembership: allMemberships.length > 0,
       isActive: isCurrentlyActive,
-      status: isCurrentlyActive ? 'ACTIVE' : (membership.status ? String(membership.status).toUpperCase() : 'PENDING'),
-      rawStatus: membership.status,
+      activeCount: activeMemberships.length,
+      memberships: allMemberships,
+      activeMemberships,
+      pendingMemberships,
+      maxDiscountPercent,
+      status: isCurrentlyActive ? 'ACTIVE' : (primaryMembership.status ? String(primaryMembership.status).toUpperCase() : 'PENDING'),
+      rawStatus: primaryMembership.status,
       pendingPaymentId: pendingPayment ? pendingPayment.id : null,
-      membership
+      membership: primaryMembership
     };
   },
 

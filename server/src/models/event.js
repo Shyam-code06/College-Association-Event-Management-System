@@ -29,7 +29,8 @@ const eventModel = {
         'events.name as title',
         'events.location as venue',
         'events.non_member_price as price',
-        'users.name as creator_name'
+        'users.name as creator_name',
+        'users.email as creator_email'
       )
       .leftJoin('users', 'events.created_by', 'users.id')
       .where('events.id', id);
@@ -76,6 +77,7 @@ const eventModel = {
         'events.location as venue',
         'events.non_member_price as price',
         'users.name as creator_name',
+        'users.email as creator_email',
         trx.raw(`
           (events.capacity - (
             SELECT COUNT(*) FROM registrations

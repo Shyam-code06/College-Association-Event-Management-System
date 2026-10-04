@@ -47,12 +47,16 @@ const PriceStep = ({ formData }) => {
       <div className="p-4 rounded-md bg-canvas border border-line space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-muted">Membership Tier</span>
-          <span className="font-semibold text-ink flex items-center gap-1.5">
+          <span className="font-semibold text-ink flex items-center gap-1.5 text-right">
             {isMember ? (
               <>
-                <Award className="h-4 w-4 text-primary" />
+                <Award className="h-4 w-4 text-primary shrink-0" />
                 <span className="text-primary font-bold">
-                  {membership?.plan_name ? `${membership.plan_name} (Active Member)` : 'Active Association Member'}
+                  {membership?.activeMemberships?.length > 1
+                    ? `${membership.activeMemberships.length} Active Club Memberships`
+                    : membership?.plan_name
+                    ? `${membership.plan_name} (Active Member)`
+                    : 'Active Association Member'}
                 </span>
               </>
             ) : (

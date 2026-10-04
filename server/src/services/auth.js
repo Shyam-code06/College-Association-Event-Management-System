@@ -98,7 +98,7 @@ const authService = {
 
     return {
       isPendingApproval: true,
-      message: 'Registration submitted successfully! Your account is pending approval from your College Administrator.',
+      message: 'Registration submitted successfully! Your data has been sent to your College Admin. After approval, you can access your dashboard.',
       user: safeUser
     };
   },
@@ -182,7 +182,7 @@ const authService = {
     if (!user.is_active) {
       if (user.role === ROLES.STUDENT) {
         throw new AppError(
-          'Your student account is pending approval from your College Administrator. An approval request has been sent. Once approved, you can access your student dashboard.',
+          'Your data has been sent to your College Admin. After approval, you can access your dashboard.',
           403,
           [{ field: 'approval', status: 'PENDING_APPROVAL', email: user.email }]
         );

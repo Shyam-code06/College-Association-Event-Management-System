@@ -203,22 +203,6 @@ export const AdminFundraisers = () => {
       ),
     },
     {
-      key: 'tasks_summary',
-      header: 'Assigned Tasks',
-      render: (row) => {
-        const total = row.progress?.tasks_total || 0;
-        const completed = row.progress?.tasks_completed || 0;
-        return (
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm bg-primary-soft text-primary text-xs font-semibold">
-              <CheckSquare className="w-3.5 h-3.5" />
-              {completed}/{total} Completed
-            </span>
-          </div>
-        );
-      },
-    },
-    {
       key: 'end_date',
       header: 'Target Date',
       render: (row) => (
@@ -385,8 +369,8 @@ export const AdminFundraisers = () => {
                     {loadingStudents
                       ? 'Loading association members...'
                       : students.length > 0
-                      ? '-- Choose Active Member Volunteer --'
-                      : '-- No Eligible Members (Must be member & non-attendee) --'}
+                        ? '-- Choose Active Member Volunteer --'
+                        : '-- No Eligible Members (Must be member & non-attendee) --'}
                   </option>
                   {students.map((std) => (
                     <option key={std.id} value={std.id}>
@@ -477,13 +461,12 @@ export const AdminFundraisers = () => {
                         <Badge status={t.status || 'PENDING'} />
                         {t.invitation_status && (
                           <span
-                            className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full ${
-                              t.invitation_status === 'accepted'
+                            className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full ${t.invitation_status === 'accepted'
                                 ? 'bg-emerald-500/15 text-emerald-600'
                                 : t.invitation_status === 'declined'
-                                ? 'bg-rose-500/15 text-rose-600'
-                                : 'bg-amber-500/15 text-amber-600'
-                            }`}
+                                  ? 'bg-rose-500/15 text-rose-600'
+                                  : 'bg-amber-500/15 text-amber-600'
+                              }`}
                           >
                             Invite: {t.invitation_status}
                           </span>
@@ -530,19 +513,18 @@ export const AdminFundraisers = () => {
                       ) : (
                         <div className="flex flex-col items-end gap-0.5">
                           <span
-                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                              t.invitation_status === 'declined'
+                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${t.invitation_status === 'declined'
                                 ? 'bg-rose-500/15 text-rose-600'
                                 : t.invitation_status === 'expired'
-                                ? 'bg-red-500/15 text-red-600'
-                                : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
-                            }`}
+                                  ? 'bg-red-500/15 text-red-600'
+                                  : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                              }`}
                           >
                             {t.invitation_status === 'declined'
                               ? 'Invite Declined'
                               : t.invitation_status === 'expired'
-                              ? 'Invite Expired'
-                              : 'Awaiting Acceptance'}
+                                ? 'Invite Expired'
+                                : 'Awaiting Acceptance'}
                           </span>
                           <span className="text-[10px] text-muted">
                             Can be completed once student accepts

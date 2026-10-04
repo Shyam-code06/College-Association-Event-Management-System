@@ -96,6 +96,7 @@ const membershipModel = {
         'memberships.*',
         'membership_plans.name as plan_name',
         'membership_plans.fee as plan_fee',
+        'membership_plans.organization',
         'membership_plans.merch_discount_percent',
         'membership_plans.ticket_discount_note'
       )
@@ -106,12 +107,49 @@ const membershipModel = {
     return query.orderBy('memberships.created_at', 'desc').first();
   },
 
-  getActiveMembership: async (userId, collegeId, trx = db) => {
+  findByUserIdAndPlan: async (userId, planId, collegeId, trx = db) => {
+    let query = trx('memberships')
+      .select(
+        'memberships.*',
+        'membership_plans.name as plan_name',
+        'membership_plans.fee as plan_fee',
+        'membership_plans.organization',
+        'membership_plans.merch_discount_percent',
+        'membership_plans.ticket_discount_note'
+      )
+      .leftJoin('membership_plans', 'memberships.plan_id', 'membership_plans.id')
+      .where('memberships.user_id', userId)
+      .where('memberships.plan_id', planId);
+
+    query = applyTenantScope(query, collegeId, 'memberships');
+    return query.orderBy('memberships.created_at', 'desc').first();
+  },
+
+  findAllByUserId: async (userId, collegeId, trx = db) => {
+    let query = trx('memberships')
+      .select(
+        'memberships.*',
+        'membership_plans.name as plan_name',
+        'membership_plans.fee as plan_fee',
+        'membership_plans.organization',
+        'membership_plans.merch_discount_percent',
+        'membership_plans.ticket_discount_note'
+      )
+      .leftJoin('membership_plans', 'memberships.plan_id', 'membership_plans.id')
+      .where('memberships.user_id', userId);
+
+    query = applyTenantScope(query, collegeId, 'memberships');
+    return query.orderBy('memberships.created_at', 'desc');
+  },
+
+  getAllActiveMemberships: async (userId, collegeId, trx = db) => {
     const today = new Date().toISOString().split('T')[0];
     let query = trx('memberships')
       .select(
         'memberships.*',
         'membership_plans.name as plan_name',
+        'membership_plans.fee as plan_fee',
+        'membership_plans.organization',
         'membership_plans.merch_discount_percent',
         'membership_plans.ticket_discount_note'
       )
@@ -124,7 +162,30 @@ const membershipModel = {
       });
 
     query = applyTenantScope(query, collegeId, 'memberships');
-    return query.first();
+    return query.orderBy('membership_plans.merch_discount_percent', 'desc');
+  },
+
+  getActiveMembership: async (userId, collegeId, trx = db) => {
+    const today = new Date().toISOString().split('T')[0];
+    let query = trx('memberships')
+      .select(
+        'memberships.*',
+        'membership_plans.name as plan_name',
+        'membership_plans.fee as plan_fee',
+        'membership_plans.organization',
+        'membership_plans.merch_discount_percent',
+        'membership_plans.ticket_discount_note'
+      )
+      .leftJoin('membership_plans', 'memberships.plan_id', 'membership_plans.id')
+      .where('memberships.user_id', userId)
+      .whereIn('memberships.status', ['active', 'ACTIVE'])
+      .whereIn('memberships.dues_status', ['paid', 'PAID'])
+      .where(function () {
+        this.whereNull('memberships.expiry_date').orWhere('memberships.expiry_date', '>=', today);
+      });
+
+    query = applyTenantScope(query, collegeId, 'memberships');
+    return query.orderBy('membership_plans.merch_discount_percent', 'desc').first();
   },
 
   deleteMembership: async (id, collegeId, trx = db) => {
