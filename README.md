@@ -30,7 +30,43 @@ Create your database and import the schema:
 mysql -u root -p < server/database.sql
 ```
 
-### 2. Backend Setup
+### 2. Environment Configuration
+Create `server/.env` with the following example values. These are placeholders, not real credentials; update the database settings for your local MySQL instance.
+```env
+NODE_ENV=development
+PORT=5000
+
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=example_user
+DB_PASSWORD=example_password
+DB_NAME=skyline_db
+DB_NAME_TEST=skyline_test_db
+DB_POOL_MIN=2
+DB_POOL_MAX=10
+
+JWT_SECRET=replace_with_a_long_random_local_development_secret
+JWT_EXPIRES_IN=7d
+
+SMTP_HOST=localhost
+SMTP_PORT=2525
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=Skyline Student Association <noreply@example.test>
+
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX=500
+AUTH_RATE_LIMIT_MAX=30
+```
+
+Create `client/.env` for the frontend API URL:
+```env
+VITE_API_URL=http://localhost:5000/api/v1
+```
+
+Use a unique, securely generated `JWT_SECRET` and real SMTP credentials only in your own deployment environment. Never commit actual secrets.
+
+### 3. Backend Setup
 ```bash
 cd server
 npm install
@@ -38,7 +74,7 @@ npm run dev
 ```
 Backend will be live at `http://localhost:5000`.
 
-### 3. Frontend Setup
+### 4. Frontend Setup
 In a new terminal window:
 ```bash
 cd client
